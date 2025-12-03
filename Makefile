@@ -14,3 +14,14 @@ binaries: _output/bin/vens
 .PHONY: _output/bin/vens
 _output/bin/vens:
 	$(GO_BUILD) -o $@ ./cmd/vens
+
+.PHONY: mvp-run
+mvp-run:
+	# export OLLAMA_MODEL="all-minilm"
+	@mkdir -p _output
+	go run ./cmd/vens generate \
+	  --config-file examples/mvp/config.yaml \
+	  --llm ollama \
+	  --sboms examples/mvp/sbom.cdx.json \
+	  examples/mvp/trivy.json \
+	  _output/vex_mvp.json
