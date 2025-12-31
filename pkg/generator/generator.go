@@ -81,7 +81,7 @@ type Generator struct {
 
 // SBOMIndexBundle is a lightweight wrapper returned by IndexSBOMLibraries.
 // It contains the in-memory vector index and a minimal resolver from
-// component IDs to normalized ParentPURL and BOMLink.
+// component IDs to ComponentContext, which holds SBOM metadata and BOMLink references.
 type SBOMIndexBundle struct {
 	sbomIndex vecindex.Index
 	ctxByID   map[string]ComponentContext // ID -> Context
@@ -503,13 +503,12 @@ func (g *Generator) IndexSBOMLibraries(ctx context.Context, sbomPaths []string) 
 
 			// Construct BOMLink if possible: urn:cdx:serialNumber/version#bom-ref
 			// See: https://cyclonedx.org/capabilities/bomlink/
-			ref := ""
+			ref := c.BomRef
+			if ref == "" {
+				ref = id // fallback to id if bom-ref is missing
+			}
 			if c.Metadata.SerialNumber != "" {
-				bomRef := c.BomRef
-				if bomRef == "" {
-					bomRef = id // fallback to id if bom-ref is missing
-				}
-				ref = fmt.Sprintf("urn:cdx:%s/%d#%s", c.Metadata.SerialNumber, c.Metadata.Version, bomRef)
+				ref = fmt.Sprintf("urn:cdx:%s/%d#%s", c.Metadata.SerialNumber, c.Metadata.Version, ref)
 			}
 
 			// store component context now; last seen wins which is fine

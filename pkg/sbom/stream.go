@@ -53,7 +53,7 @@ func StreamCycloneDXLibraries(path string, cb func(types.SBOMComponent) error) e
 		Version: 1,
 	}
 
-	// Iterate root keys; handle metadata (for parent PURL) and components array
+	// Iterate root keys; handle serialNumber, version, metadata (for parent PURL), and components array
 	for dec.More() {
 		t, err := dec.Token()
 		if err != nil {
