@@ -69,17 +69,23 @@ func (h *trivyJsonOutputHandler) Close() error {
 							}
 
 							if r, ok := ratingsMap[key]; ok {
-								vulnMap["vens_rating"] = map[string]interface{}{
-									"score":         *r.Rating.Score,
+								ratingData := map[string]interface{}{
 									"severity":      string(r.Rating.Severity),
 									"justification": r.Rating.Justification,
 								}
+								if r.Rating.Score != nil {
+									ratingData["score"] = *r.Rating.Score
+								}
+								vulnMap["vens_rating"] = ratingData
 							} else if r, ok := ratingsMap[vulnID]; ok {
-								vulnMap["vens_rating"] = map[string]interface{}{
-									"score":         *r.Rating.Score,
+								ratingData := map[string]interface{}{
 									"severity":      string(r.Rating.Severity),
 									"justification": r.Rating.Justification,
 								}
+								if r.Rating.Score != nil {
+									ratingData["score"] = *r.Rating.Score
+								}
+								vulnMap["vens_rating"] = ratingData
 							}
 						}
 					}

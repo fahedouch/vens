@@ -16,23 +16,16 @@ package generate
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"strings"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
-	dbTypes "github.com/aquasecurity/trivy-db/pkg/types"
-	trivyreport "github.com/aquasecurity/trivy/pkg/report"
-	trivytable "github.com/aquasecurity/trivy/pkg/report/table"
 	trivytypes "github.com/aquasecurity/trivy/pkg/types"
-	trivyvex "github.com/aquasecurity/trivy/pkg/vex"
 
 	"github.com/fahedouch/vens/pkg/generator"
 	"github.com/fahedouch/vens/pkg/llm"
@@ -235,116 +228,14 @@ func action(cmd *cobra.Command, args []string) error {
 	switch outputFormat {
 	case "cyclonedxvex":
 		// Output VEX only
-		return writeVEX(outputPath, &vex)
+		return outputhandler.WriteVEX(outputPath, &vex)
 
 	case "trivyjson", "trivytable":
 		// Apply VEX to Trivy report and output in Trivy format
-		return applyVEXAndOutputTrivyReport(ctx, outputPath, outputFormat, &trivyReport, &vex, flags)
+		severity, _ := flags.GetStringSlice("severity")
+		return outputhandler.ApplyVEXAndOutputTrivyReport(ctx, outputPath, outputFormat, &trivyReport, &vex, severity)
 
 	default:
 		return fmt.Errorf("unknown output format %q", outputFormat)
-	}
-}
-
-func writeVEX(outputPath string, vex *cdx.BOM) error {
-	var outputW io.WriteCloser
-	if outputPath == "-" || outputPath == "/dev/stdout" {
-		outputW = os.Stdout
-	} else {
-		var err error
-		outputW, err = os.Create(outputPath)
-		if err != nil {
-			return err
-		}
-		defer outputW.Close()
-	}
-
-	enc := json.NewEncoder(outputW)
-	enc.SetIndent("", "  ")
-	return enc.Encode(vex)
-}
-
-func applyVEXAndOutputTrivyReport(ctx context.Context, outputPath string, outputFormat string, report *trivytypes.Report, vex *cdx.BOM, flags *pflag.FlagSet) error {
-	// Create a temporary VEX file for Trivy's VEX module
-	tmpVEX, err := os.CreateTemp("", "vens-*.vex.cdx.json")
-	if err != nil {
-		return fmt.Errorf("failed to create temp vex file: %w", err)
-	}
-	defer os.Remove(tmpVEX.Name())
-
-	if err := json.NewEncoder(tmpVEX).Encode(vex); err != nil {
-		tmpVEX.Close()
-		return fmt.Errorf("failed to write VEX: %w", err)
-	}
-	tmpVEX.Close()
-
-	// Use Trivy's VEX filter to apply VEX to the report
-	slog.Info("Applying VEX to Trivy report...")
-	vexOpts := trivyvex.Options{
-		Sources: []trivyvex.Source{
-			{
-				Type:     trivyvex.TypeFile,
-				FilePath: tmpVEX.Name(),
-			},
-		},
-	}
-
-	if err := trivyvex.Filter(ctx, report, vexOpts); err != nil {
-		return fmt.Errorf("failed to apply VEX: %w", err)
-	}
-
-	// Output the report
-	var outputW io.WriteCloser
-	if outputPath == "-" || outputPath == "/dev/stdout" {
-		outputW = os.Stdout
-	} else {
-		var err error
-		outputW, err = os.Create(outputPath)
-		if err != nil {
-			return err
-		}
-		defer outputW.Close()
-	}
-
-	switch outputFormat {
-	case "trivyjson":
-		// Use Trivy's JSON writer
-		return trivyreport.Write(ctx, *report, trivyreport.Option{
-			Format: "json",
-			Output: outputW,
-		})
-
-	case "trivytable":
-		// Use Trivy's table renderer
-		var buf bytes.Buffer
-
-		// Parse severities
-		severities, _ := flags.GetStringSlice("severity")
-		var sevs []dbTypes.Severity
-		if len(severities) > 0 {
-			for _, s := range severities {
-				sevs = append(sevs, dbTypes.Severity(strings.ToUpper(s)))
-			}
-		} else {
-			// Default to all severities
-			sevs = []dbTypes.Severity{
-				dbTypes.SeverityCritical,
-				dbTypes.SeverityHigh,
-				dbTypes.SeverityMedium,
-				dbTypes.SeverityLow,
-				dbTypes.SeverityUnknown,
-			}
-		}
-
-		renderer := trivytable.NewVulnerabilityRenderer(&buf, true, false, false, sevs)
-		for _, result := range report.Results {
-			renderer.Render(result)
-		}
-
-		_, err := outputW.Write(buf.Bytes())
-		return err
-
-	default:
-		return fmt.Errorf("unsupported Trivy output format: %s", outputFormat)
 	}
 }
