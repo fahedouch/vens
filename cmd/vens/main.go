@@ -18,10 +18,11 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/fahedouch/vens/cmd/vens/commands/generate"
-	"github.com/fahedouch/vens/cmd/vens/version"
-	"github.com/fahedouch/vens/pkg/envutil"
 	"github.com/spf13/cobra"
+	"github.com/venslabs/vens/cmd/vens/commands/enrich"
+	"github.com/venslabs/vens/cmd/vens/commands/generate"
+	"github.com/venslabs/vens/cmd/vens/version"
+	"github.com/venslabs/vens/pkg/envutil"
 )
 
 var logLevel = new(slog.LevelVar)
@@ -57,8 +58,10 @@ func newRootCommand() *cobra.Command {
 		return nil
 	}
 
-	// TODO add generate cmd
-	cmd.AddCommand(generate.New())
+	cmd.AddCommand(
+		generate.New(),
+		enrich.New(),
+	)
 
 	return cmd
 }

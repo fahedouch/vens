@@ -19,7 +19,7 @@ import (
 	"strconv"
 )
 
-// Version can be fulfilled on compilation time: -ldflags="-X github.com/fahedouch/vens/cmd/vens/version.Version=v0.1.0"
+// Version can be fulfilled on compilation time: -ldflags="-X github.com/venslabs/vens/cmd/vens/version.Version=v0.1.0"
 var Version string
 
 func GetVersion() string {

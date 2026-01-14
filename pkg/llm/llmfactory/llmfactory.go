@@ -20,12 +20,12 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/fahedouch/vens/pkg/llm"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/anthropic"
 	"github.com/tmc/langchaingo/llms/googleai"
 	"github.com/tmc/langchaingo/llms/ollama"
 	"github.com/tmc/langchaingo/llms/openai"
+	"github.com/venslabs/vens/pkg/llm"
 )
 
 // New instantiates an LLM.

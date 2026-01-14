@@ -27,7 +27,7 @@ No more endless lists of CVEs without context. **vens** helps you focus on what 
 ### Installation
 
 ```bash
-go install github.com/fahedouch/vens/cmd/vens@latest
+go install github.com/venslabs/vens/cmd/vens@latest
 ```
 
 ### Usage
@@ -106,6 +106,22 @@ vens generate [flags] INPUT OUTPUT
 | `--llm-seed` | Seed for reproducible results | `0` |
 | `--input-format` | Input format (`auto`, `trivy`) | `auto` |
 | `--output-format` | Output format (`auto`, `cyclonedxvex`) | `auto` |
+| `--debug` | Enable debug logging | `false` |
+
+### `vens enrich`
+
+Enrich a Trivy vulnerability report with OWASP scores from a VEX document.
+
+**Usage:**
+```bash
+vens enrich --vex VEX_FILE [flags] REPORT_FILE
+```
+
+**Flags:**
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--vex` | **(Required)** Path to the VEX file (CycloneDX) | |
+| `--output` | Output file path (if not specified, prints to stdout) | |
 | `--debug` | Enable debug logging | `false` |
 
 ## 📖 Documentation
