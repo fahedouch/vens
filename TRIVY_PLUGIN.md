@@ -7,7 +7,7 @@ Vens can be used as a Trivy plugin to evaluate and prioritize vulnerabilities ba
 Install vens as a Trivy plugin:
 
 ```bash
-trivy plugin install github.com/fahedouch/vens
+trivy plugin install github.com/venslabs/vens
 ```
 
 ## Usage
@@ -34,7 +34,7 @@ Enrich a Trivy vulnerability report with ratings and scores from a VEX document:
 # Scan an image with Trivy
 trivy image python:3.12.4 --format=json --severity HIGH,CRITICAL > report.json
 
-# Enrich the report with VEX statements
+# Enrich the report with VEX ratings
 trivy vens enrich --vex vex.cdx.json report.json
 
 # Or save to a file
@@ -77,7 +77,7 @@ Vens leverages Trivy's official types for seamless integration:
 The plugin implementation includes:
 
 1. **trivypluginutil**: Detects when running as a Trivy plugin
-2. **vexenricher**: Enriches Trivy reports with VEX statements
+2. **vexenricher**: Enriches Trivy reports with VEX ratings
 3. **plugin.yaml**: Trivy plugin manifest defining supported platforms
 
 ## Standalone Usage
@@ -89,6 +89,28 @@ Vens can also be used as a standalone tool without Trivy:
 vens generate --config-file config.yaml --sboms sbom1.cdx.json report.json output.cdx
 vens enrich --vex vex.cdx.json report.json
 ```
+
+## Local Development and Testing
+
+To test the plugin locally before it's officially indexed:
+
+1. **Compile and Install locally**:
+   ```bash
+   make install-plugin
+   ```
+   Cette commande compile le binaire localement, désinstalle toute version existante, et installe le plugin à partir du répertoire courant. 
+   
+   Le fichier `plugin.yaml` est configuré sans champ `uri` pour privilégier l'utilisation du binaire local lors du développement.
+
+2. **Verify installation**:
+   ```bash
+   trivy plugin list
+   ```
+
+3. **Use the plugin**:
+   ```bash
+   trivy vens --help
+   ```
 
 ## References
 

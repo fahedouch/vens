@@ -20,16 +20,16 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/fahedouch/vens/pkg/trivypluginutil"
-	"github.com/fahedouch/vens/pkg/vexenricher"
 	"github.com/spf13/cobra"
+	"github.com/venslabs/vens/pkg/trivypluginutil"
+	"github.com/venslabs/vens/pkg/vexenricher"
 )
 
 func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "enrich --vex VEX_FILE REPORT_FILE",
-		Short:                 "Enrich a Trivy report with VEX statements",
-		Long:                  "Enrich a Trivy vulnerability report with VEX (Vulnerability Exploitability eXchange) statements, applying ratings and status from the VEX document.",
+		Short:                 "Enrich a Trivy report with VEX ratings",
+		Long:                  "Enrich a Trivy vulnerability report with VEX (Vulnerability Exploitability eXchange) ratings, applying only the ratings from the VEX document.",
 		Example:               Example(),
 		RunE:                  action,
 		DisableFlagsInUseLine: true,
@@ -50,13 +50,17 @@ func Example() string {
 		exe = "trivy " + exe
 	}
 	return fmt.Sprintf(`  # Basic usage
+  export OPENAI_API_KEY=...
+  export OPENAI_MODEL=gpt-4o-mini
+
   trivy image python:3.12.4 --format=json --severity HIGH,CRITICAL >report.json
 
+  %s generate --config-file config.yaml --sboms sbom.cdx.json report.json vex.cdx.json
   %s enrich --vex vex.cdx.json report.json
 
   # With output file
   %s enrich --vex vex.cdx.json --output enriched-report.json report.json
-`, exe, exe)
+`, exe, exe, exe)
 }
 
 func action(cmd *cobra.Command, args []string) error {

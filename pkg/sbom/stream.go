@@ -20,7 +20,7 @@ import (
 	"os"
 	"strings"
 
-	types "github.com/fahedouch/vens/pkg/api/types"
+	types "github.com/venslabs/vens/pkg/api/types"
 )
 
 // StreamCycloneDXLibraries performs a single-pass streaming parse of a CycloneDX

@@ -1,5 +1,5 @@
 VERSION ?=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always --tags)
-VERSION_SYMBOL := github.com/fahedouch/vens/cmd/vens/version.Version
+VERSION_SYMBOL := github.com/venslabs/vens/cmd/vens/version.Version
 
 GO ?= go
 GO_LDFLAGS ?= -s -w -X $(VERSION_SYMBOL)=$(VERSION)
@@ -37,3 +37,8 @@ quickstart-enrich:
 	  --vex _output/vex_quickstart.json \
 	  --output _output/enriched_trivy.json \
 	  examples/quickstart/trivy.json
+
+.PHONY: install-plugin
+install-plugin:
+	$(GO_BUILD) -o vens ./cmd/vens
+	trivy plugin install .

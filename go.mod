@@ -1,4 +1,4 @@
-module github.com/fahedouch/vens
+module github.com/venslabs/vens
 
 go 1.25
 

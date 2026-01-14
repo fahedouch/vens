@@ -27,7 +27,7 @@ No more endless lists of CVEs without context. **vens** helps you focus on what 
 ### Installation
 
 ```bash
-go install github.com/fahedouch/vens/cmd/vens@latest
+go install github.com/venslabs/vens/cmd/vens@latest
 ```
 
 ### Usage

@@ -22,19 +22,19 @@ import (
 	"strings"
 
 	trivytypes "github.com/aquasecurity/trivy/pkg/types"
-	"github.com/fahedouch/vens/pkg/generator"
-	"github.com/fahedouch/vens/pkg/llm"
-	"github.com/fahedouch/vens/pkg/llm/llmfactory"
-	outputhandler "github.com/fahedouch/vens/pkg/outputhandler"
-	"github.com/fahedouch/vens/pkg/riskconfig"
-	"github.com/fahedouch/vens/pkg/trivypluginutil"
 	"github.com/spf13/cobra"
+	"github.com/venslabs/vens/pkg/generator"
+	"github.com/venslabs/vens/pkg/llm"
+	"github.com/venslabs/vens/pkg/llm/llmfactory"
+	outputhandler "github.com/venslabs/vens/pkg/outputhandler"
+	"github.com/venslabs/vens/pkg/riskconfig"
+	"github.com/venslabs/vens/pkg/trivypluginutil"
 )
 
 func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "generate INPUT OUTPUT",
-		Short: "Generate VEX using LLM",
+		Short: "Generate CycloneDx VEX using LLM",
 		Long:  "Generate Vulnerability-Exploitability eXchange (VEX) information using an LLM to prioritize CVEs based on risk.",
 		// TODO: Support multiple input reports in a single command to improve UX,
 		Example:               Example(),

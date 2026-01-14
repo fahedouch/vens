@@ -24,10 +24,10 @@ import (
 	trivytypes "github.com/aquasecurity/trivy/pkg/types"
 )
 
-// VEXEnricher enriches Trivy reports with VEX statements using simple Vulnerability ID matching
+// VEXEnricher enriches Trivy reports with VEX ratings using simple Vulnerability ID matching
 type VEXEnricher struct {
 	// Map of VulnerabilityID to OWASP Score
-	scores map[string]float64
+	OWASPScorePerVulnID map[string]float64
 }
 
 // New creates a new VEXEnricher from VEX data
@@ -38,10 +38,10 @@ func New(vexData []byte) (*VEXEnricher, error) {
 	}
 
 	enricher := &VEXEnricher{
-		scores: make(map[string]float64),
+		OWASPScorePerVulnID: make(map[string]float64),
 	}
 
-	// Parse VEX statements - extract OWASP ratings by Vulnerability ID
+	// Parse VEX vulnerabilities - extract OWASP ratings by Vulnerability ID
 	if vexDoc.Vulnerabilities != nil {
 		for _, vuln := range *vexDoc.Vulnerabilities {
 			if vuln.Ratings == nil {
@@ -56,8 +56,8 @@ func New(vexData []byte) (*VEXEnricher, error) {
 
 				// Map the score to the vulnerability ID.
 				// Note: if multiple entries exist for the same CVE in VEX,
-				// we take the last one found in this simple implementation.
-				enricher.scores[vuln.ID] = *rating.Score
+				// we take the last one found.
+				enricher.OWASPScorePerVulnID[vuln.ID] = *rating.Score
 			}
 		}
 	}
@@ -65,7 +65,7 @@ func New(vexData []byte) (*VEXEnricher, error) {
 	return enricher, nil
 }
 
-// EnrichReport enriches a Trivy report with OWASP scores from VEX
+// EnrichReport enriches a Trivy report with OWASP ratings from VEX
 func (e *VEXEnricher) EnrichReport(ctx context.Context, reportData []byte) (*trivytypes.Report, error) {
 	var report trivytypes.Report
 	if err := json.Unmarshal(reportData, &report); err != nil {
@@ -73,7 +73,7 @@ func (e *VEXEnricher) EnrichReport(ctx context.Context, reportData []byte) (*tri
 	}
 
 	slog.DebugContext(ctx, "Starting simple VEX enrichment",
-		"vex_scores_count", len(e.scores))
+		"vex_scores_count", len(e.OWASPScorePerVulnID))
 
 	enrichedCount := 0
 	for i := range report.Results {
@@ -81,7 +81,7 @@ func (e *VEXEnricher) EnrichReport(ctx context.Context, reportData []byte) (*tri
 		for j := range result.Vulnerabilities {
 			vuln := &result.Vulnerabilities[j]
 
-			if score, ok := e.scores[vuln.VulnerabilityID]; ok {
+			if score, ok := e.OWASPScorePerVulnID[vuln.VulnerabilityID]; ok {
 				if e.applyRating(vuln, score) {
 					enrichedCount++
 				}
@@ -90,7 +90,7 @@ func (e *VEXEnricher) EnrichReport(ctx context.Context, reportData []byte) (*tri
 	}
 
 	if enrichedCount > 0 {
-		slog.InfoContext(ctx, "Enriched report with VEX scores", "count", enrichedCount)
+		slog.InfoContext(ctx, "Enriched report with VEX ratings", "count", enrichedCount)
 	}
 
 	return &report, nil
