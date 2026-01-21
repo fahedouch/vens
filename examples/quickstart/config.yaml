@@ -1,8 +1,15 @@
-# vens uses the component SBOM to match component scores to vulnerabilities.
-# Ensure that each component here has a corresponding SBOM.
-# Use version-less PURLs as keys.
+# vens configuration file
+# Each component has an OWASP risk score based on its business context.
+# Use version-less PURLs as keys to match components from the SBOMs.
+
 owasp:
-  pkg:module/quickstart-sample-app:
-    score: 30
-    likelihood: 5
+  # NGINX - Public-facing web server (internet exposed)
+  # High likelihood of attack, critical impact if compromised
+  pkg:oci/nginx:
+    likelihood: 6
     impact: 6
+
+  # Redis - Internal cache
+  # Not directly exposed, lower attack surface
+  pkg:oci/redis:
+    score: 12
