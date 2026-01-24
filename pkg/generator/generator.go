@@ -52,7 +52,6 @@ type Vulnerability struct {
 }
 
 // llmOutputEntry represents the LLM response for a single vulnerability.
-// Inspired by vexllm's llmOutputEntry structure (github.com/AkihiroSuda/vexllm).
 type llmOutputEntry struct {
 	VulnID                      string  `json:"vulnId"`
 	ThreatAgentContribution     float64 `json:"threat_agent_contribution"`
@@ -63,7 +62,6 @@ type llmOutputEntry struct {
 }
 
 // llmOutput wraps the array of results from LLM.
-// Structure inspired by vexllm (github.com/AkihiroSuda/vexllm).
 type llmOutput struct {
 	Results []llmOutputEntry `json:"results"`
 }
@@ -177,7 +175,6 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 
 // evaluateOWASPContributions calls the LLM to evaluate how each vulnerability
 // contributes to the 4 OWASP factors. Returns a map from VulnID to contributions.
-// The prompt structure is inspired by vexllm (github.com/AkihiroSuda/vexllm).
 func (g *Generator) evaluateOWASPContributions(ctx context.Context, vulns []Vulnerability) (map[string]riskconfig.OWASPContributions, error) {
 	if g.o.LLM == nil {
 		return nil, errors.New("no LLM configured")
@@ -202,7 +199,6 @@ func (g *Generator) evaluateOWASPContributions(ctx context.Context, vulns []Vuln
 	}
 
 	// Build system prompt with OWASP context
-	// Inspired by vexllm's system prompt structure (github.com/AkihiroSuda/vexllm)
 	systemPrompt := g.buildSystemPrompt()
 
 	// Build JSON schema for structured output
@@ -222,7 +218,6 @@ func (g *Generator) evaluateOWASPContributions(ctx context.Context, vulns []Vuln
 	callOpts = append(callOpts, llms.WithJSONSchema(schema))
 
 	// Build human prompt with vulnerabilities
-	// Inspired by vexllm's human prompt structure (github.com/AkihiroSuda/vexllm)
 	vulnsJSON, err := json.Marshal(vulns)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal vulnerabilities: %w", err)
@@ -281,7 +276,6 @@ func (g *Generator) evaluateOWASPContributions(ctx context.Context, vulns []Vuln
 }
 
 // buildSystemPrompt creates the system prompt for OWASP contribution evaluation.
-// The structure is inspired by vexllm (github.com/AkihiroSuda/vexllm).
 func (g *Generator) buildSystemPrompt() string {
 	prompt := `You are a cybersecurity expert specialized in OWASP Risk Rating Methodology.
 Your mission is to evaluate how much each vulnerability contributes to the 4 OWASP risk factors.

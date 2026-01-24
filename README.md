@@ -173,10 +173,6 @@ vens enrich --vex VEX_FILE [flags] REPORT_FILE
 - [Input Processing](docs/inputs/input-processing.md): Supported formats and data flow.
 - [Testing Strategy](docs/testing.md): How we ensure the tool's reliability.
 
-## 🙏 Acknowledgments
-
-- LLM prompt structure inspired by [vexllm](https://github.com/AkihiroSuda/vexllm)
-
 ## 🤝 Contributing
 
 Contributions are welcome! Feel free to open an issue or submit a pull request.
