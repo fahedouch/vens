@@ -4,19 +4,19 @@ This directory contains a **real-world example** demonstrating how **vens** prio
 
 ## Overview
 
-In this example, we scan a **production NGINX container image** and use LLM to evaluate each vulnerability's contribution to OWASP risk factors.
+In this example, we scan a **production NGINX container image** and use LLM to calculate OWASP risk scores for each vulnerability based on your project context.
 
 | Image | Role | Description |
 |-------|------|-------------|
 | `nginx:1.25` | Public-facing web server | Internet-exposed, high attack surface |
 
-**The key insight**: vens uses LLM to analyze each CVE and evaluate how much it contributes to your project's risk profile based on the OWASP factors you define.
+**The key insight**: vens uses LLM to analyze each CVE and calculate its OWASP risk score based on the context hints you provide (exposure, data sensitivity, business criticality).
 
 ## Directory Structure
 
 ```
 quickstart/
-├── config.yaml          # OWASP risk factors for your project
+├── config.yaml          # Context hints for OWASP risk calculation
 ├── reports/             # Trivy vulnerability reports
 │   └── nginx.trivy.json
 └── output_vex.cdx.json  # Generated VEX with risk scores
@@ -25,9 +25,9 @@ quickstart/
 ## How It Works
 
 1. **Vulnerability Report** (`reports/`): Trivy scan identifies CVEs in the image
-2. **Risk Configuration** (`config.yaml`): You define base OWASP risk factors for your project context
-3. **LLM Analysis**: vens uses LLM to evaluate each vulnerability's contribution (0-100%) to each OWASP factor
-4. **Risk Score**: Final weighted score computed using OWASP Risk Rating formula
+2. **Context Configuration** (`config.yaml`): You define simple context hints for your project
+3. **LLM Analysis**: vens uses LLM to calculate OWASP risk scores based on your context
+4. **Risk Score**: Final score computed using OWASP Risk Rating formula (0-81)
 
 ## Configuration (`config.yaml`)
 
@@ -36,12 +36,28 @@ project:
   name: "nginx-production"
   description: "Production NGINX web server exposed to internet"
 
-owasp:
-  threat_agent: 7      # 0-9: Who might attack?
-  vulnerability: 6     # 0-9: How easy to exploit?
-  technical_impact: 7  # 0-9: Damage to systems?
-  business_impact: 8   # 0-9: Business consequences?
+context:
+  exposure: "internet"              # internal | private | internet
+  data_sensitivity: "high"          # low | medium | high | critical
+  business_criticality: "critical"  # low | medium | high | critical
+  notes: "Handles customer PII, PCI-DSS compliance required"
 ```
+
+### Context Values
+
+| Field | Value | Description |
+|-------|-------|-------------|
+| **exposure** | `internal` | Corporate network only |
+| | `private` | Requires VPN/authentication |
+| | `internet` | Publicly accessible |
+| **data_sensitivity** | `low` | Public data |
+| | `medium` | Internal data |
+| | `high` | PII, financial data |
+| | `critical` | Secrets, credentials, PHI |
+| **business_criticality** | `low` | Dev/test environments |
+| | `medium` | Internal tools |
+| | `high` | Customer-facing services |
+| | `critical` | Revenue-critical, compliance |
 
 ## Running the Example
 
@@ -72,19 +88,21 @@ vens generate \
 
 ## LLM Reasoning Example
 
-For each vulnerability, the LLM evaluates its contribution to OWASP factors:
+For each vulnerability, the LLM calculates the OWASP risk score based on your context:
 
 ```
 CVE-2024-1234 in OpenSSL (RCE):
-├── Threat Agent:      90%  → Widely known, public exploits available
-├── Vulnerability:     85%  → POC available, easy to exploit
-├── Technical Impact:  95%  → RCE = full system compromise
-└── Business Impact:  100%  → Frontend server, critical for business
+├── Context: internet-exposed, high data sensitivity, critical business
+├── Threat Agent: 8/9 (public exploits, APT target)
+├── Vulnerability: 7/9 (easy to exploit, POC available)
+├── Technical Impact: 8/9 (RCE, data compromise)
+├── Business Impact: 9/9 (revenue-critical, compliance)
+└── OWASP Score: 63.75/81 → CRITICAL
 
-Final Score Calculation:
-  Likelihood = (7 × 0.90 + 6 × 0.85) / 2 = 5.70
-  Impact = (7 × 0.95 + 8 × 1.00) / 2 = 7.33
-  Risk = 5.70 × 7.33 = 41.78 (CRITICAL)
+Score Calculation:
+  Likelihood = (8 + 7) / 2 = 7.5
+  Impact = (8 + 9) / 2 = 8.5
+  Risk = 7.5 × 8.5 = 63.75
 ```
 
 ## Example Output
@@ -102,7 +120,7 @@ After running vens, `output_vex.cdx.json` contains a CycloneDX VEX document with
       "id": "CVE-2024-1234",
       "ratings": [
         {
-          "score": 41.78,
+          "score": 63.75,
           "severity": "critical",
           "method": "OWASP"
         }
@@ -112,7 +130,7 @@ After running vens, `output_vex.cdx.json` contains a CycloneDX VEX document with
       "id": "CVE-2024-5678",
       "ratings": [
         {
-          "score": 12.5,
+          "score": 12.25,
           "severity": "low",
           "method": "OWASP"
         }
@@ -125,8 +143,8 @@ After running vens, `output_vex.cdx.json` contains a CycloneDX VEX document with
 ### Understanding the Output
 
 Each vulnerability receives a contextual OWASP risk score based on:
-- The base risk factors you defined in `config.yaml`
-- The LLM's evaluation of how much each CVE contributes to those factors
+- Your project context (exposure, data sensitivity, business criticality)
+- The LLM's analysis of the vulnerability type and affected package
 
 | Severity | Score Range | Action |
 |----------|-------------|--------|
@@ -147,7 +165,7 @@ trivy image nginx:1.25 --format json --output reports/nginx.trivy.json
 
 ## Key Takeaways
 
-1. **Context matters**: LLM evaluates each CVE based on your project's specific context
-2. **OWASP methodology**: Industry-standard risk rating for consistent prioritization
-3. **Actionable output**: CycloneDX VEX format integrates with security platforms
-4. **Customizable**: Adjust base OWASP factors to match your risk tolerance
+1. **Simple configuration**: Just 3 required fields (exposure, data_sensitivity, business_criticality)
+2. **Context matters**: LLM evaluates each CVE based on your project's specific context
+3. **OWASP methodology**: Industry-standard risk rating for consistent prioritization
+4. **Actionable output**: CycloneDX VEX format integrates with security platforms

@@ -16,7 +16,7 @@ Once installed, you can use vens commands directly through Trivy:
 
 ### 1. Generate VEX with LLM
 
-Generate a VEX document from a Trivy scan report using LLM to evaluate OWASP risk contributions:
+Generate a VEX document from a Trivy scan report using LLM to calculate OWASP risk scores:
 
 ```bash
 # Set up your LLM API key
@@ -50,19 +50,45 @@ trivy vens enrich --vex vex.cdx.json --output enriched-report.json report.json
 
 ## Configuration
 
-Create a `config.yaml` file with your project's OWASP risk factors:
+Create a `config.yaml` file with your project's context hints:
 
 ```yaml
 project:
   name: "my-project"
   description: "Production web application"
 
-owasp:
-  threat_agent: 7      # 0-9: Who might attack?
-  vulnerability: 6     # 0-9: How easy to exploit?
-  technical_impact: 7  # 0-9: Damage to systems?
-  business_impact: 8   # 0-9: Business consequences?
+context:
+  # How is the system exposed?
+  # Values: internal | private | internet
+  exposure: "internet"
+
+  # What type of data is handled?
+  # Values: low | medium | high | critical
+  data_sensitivity: "high"
+
+  # How critical is the system?
+  # Values: low | medium | high | critical
+  business_criticality: "critical"
+
+  # Additional context (optional)
+  notes: "Handles customer PII, PCI-DSS compliance required"
 ```
+
+### Context Values
+
+| Field | Value | Description |
+|-------|-------|-------------|
+| **exposure** | `internal` | Corporate network only |
+| | `private` | Requires VPN/authentication |
+| | `internet` | Publicly accessible |
+| **data_sensitivity** | `low` | Public data |
+| | `medium` | Internal data |
+| | `high` | PII, financial data |
+| | `critical` | Secrets, credentials, PHI |
+| **business_criticality** | `low` | Dev/test environments |
+| | `medium` | Internal tools |
+| | `high` | Customer-facing services |
+| | `critical` | Revenue-critical, compliance |
 
 ## LLM Backends
 

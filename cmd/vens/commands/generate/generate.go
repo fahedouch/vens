@@ -36,16 +36,15 @@ func New() *cobra.Command {
 		Short: "Generate CycloneDx VEX with OWASP risk scores using LLM",
 		Long: `Generate Vulnerability-Exploitability eXchange (VEX) information using an LLM to prioritize CVEs based on risk.
 
-The LLM analyzes each vulnerability and evaluates how much it contributes to:
-- Threat Agent: Who might attack? (skill, motivation, opportunity)
-- Vulnerability: How easy to exploit? (discovery, exploit availability)  
-- Technical Impact: Damage to systems? (confidentiality, integrity, availability)
-- Business Impact: Business consequences? (financial, reputation, compliance)
+The LLM analyzes each vulnerability using the project context hints you provide:
+- Exposure: How is the system exposed? (internal, private, internet)
+- Data Sensitivity: What type of data is handled? (low, medium, high, critical)
+- Business Criticality: How critical is the system? (low, medium, high, critical)
 
-The final risk score is computed using the OWASP Risk Rating Methodology:
+The LLM calculates the OWASP risk score (0-81) for each vulnerability using:
   Risk = Likelihood × Impact
-  Where: Likelihood = (ThreatAgent × contrib + Vulnerability × contrib) / 2
-         Impact = (TechnicalImpact × contrib + BusinessImpact × contrib) / 2`,
+  Where: Likelihood = (Threat Agent + Vulnerability Factor) / 2
+         Impact = (Technical Impact + Business Impact) / 2`,
 		Example:               Example(),
 		Args:                  cobra.ExactArgs(2),
 		RunE:                  action,
@@ -84,11 +83,11 @@ func Example() string {
   # project:
   #   name: "nginx-production"
   #   description: "Production web server"
-  # owasp:
-  #   threat_agent: 7      # 0-9: Who might attack?
-  #   vulnerability: 6     # 0-9: How easy to exploit?
-  #   technical_impact: 7  # 0-9: Damage to systems?
-  #   business_impact: 8   # 0-9: Business consequences?
+  # context:
+  #   exposure: "internet"              # internal | private | internet
+  #   data_sensitivity: "high"          # low | medium | high | critical
+  #   business_criticality: "critical"  # low | medium | high | critical
+  #   notes: "Handles customer PII"     # optional
 `, exe)
 }
 
@@ -101,7 +100,7 @@ func action(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--config-file is required")
 	}
 
-	// Load config.yaml with OWASP factors
+	// Load config.yaml with context hints
 	cfg, err := riskconfig.Load(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to load config file %q: %w", configPath, err)
@@ -110,14 +109,11 @@ func action(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("config file %q is empty or invalid", configPath)
 	}
 
-	baseRisk := cfg.ComputeBaseRisk()
 	slog.InfoContext(ctx, "Config loaded",
 		"project", cfg.Project.Name,
-		"threat_agent", cfg.OWASP.ThreatAgent,
-		"vulnerability", cfg.OWASP.Vulnerability,
-		"technical_impact", cfg.OWASP.TechnicalImpact,
-		"business_impact", cfg.OWASP.BusinessImpact,
-		"base_risk", fmt.Sprintf("%.2f", baseRisk),
+		"exposure", cfg.Context.Exposure,
+		"data_sensitivity", cfg.Context.DataSensitivity,
+		"business_criticality", cfg.Context.BusinessCriticality,
 	)
 
 	var o generator.Opts

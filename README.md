@@ -3,7 +3,7 @@
 </p>
 
 
-**Vens** is an AI-powered vulnerability risk scorer. It analyzes security reports and evaluates each vulnerability's contribution to **OWASP Risk Rating factors** using LLMs, generating precise **CycloneDX VEX** documents with contextual risk scores.
+**Vens** is an AI-powered vulnerability risk scorer. It analyzes security reports and calculates **OWASP Risk Rating scores** for each vulnerability using LLMs, generating precise **CycloneDX VEX** documents with contextual risk scores.
 
 Stop wasting time on contextless CVE lists. Focus on the risks that actually matter.
 
@@ -19,26 +19,27 @@ Stop wasting time on contextless CVE lists. Focus on the risks that actually mat
 
 Vens uses the **OWASP Risk Rating Methodology** to compute contextual risk scores:
 
-1. **You define your project's base risk factors** in `config.yaml`:
-   - **Threat Agent** (0-9): Who might attack? (skill, motivation, opportunity)
-   - **Vulnerability** (0-9): How easy to discover and exploit?
-   - **Technical Impact** (0-9): Damage to systems, data, infrastructure
-   - **Business Impact** (0-9): Financial, reputation, compliance consequences
+1. **You define your project's context** in `config.yaml` using simple hints:
+   - **Exposure**: How is the system exposed? (internal, private, internet)
+   - **Data Sensitivity**: What type of data is handled? (low, medium, high, critical)
+   - **Business Criticality**: How critical is the system? (low, medium, high, critical)
 
-2. **The LLM analyzes each vulnerability** and evaluates its contribution (0-100%) to each factor:
+2. **The LLM analyzes each vulnerability** using your context and calculates the OWASP risk score:
    ```
    CVE-2024-1234 in OpenSSL (RCE):
-   ├── Threat Agent:      90%  → Widely known, public exploits
-   ├── Vulnerability:     85%  → POC available, easy to exploit
-   ├── Technical Impact:  95%  → RCE = full system compromise
-   └── Business Impact:  100%  → Frontend server, critical
+   ├── Context: internet-exposed, high data sensitivity, critical business
+   ├── Threat Agent: 8/9 (public exploits, APT target)
+   ├── Vulnerability: 7/9 (easy to exploit, POC available)
+   ├── Technical Impact: 8/9 (RCE, data compromise)
+   ├── Business Impact: 9/9 (revenue-critical, compliance)
+   └── OWASP Score: 63.75/81 → CRITICAL
    ```
 
-3. **Final weighted risk score** is computed:
+3. **Risk score formula** (OWASP Risk Rating Methodology):
    ```
-   Likelihood = (ThreatAgent × 0.90 + Vulnerability × 0.85) / 2
-   Impact = (TechnicalImpact × 0.95 + BusinessImpact × 1.00) / 2
-   Risk = Likelihood × Impact
+   Likelihood = (Threat Agent + Vulnerability Factor) / 2
+   Impact = (Technical Impact + Business Impact) / 2
+   Risk = Likelihood × Impact  (range: 0-81)
    ```
 
 ## 🚀 Quick Start
@@ -72,7 +73,7 @@ vens generate --config-file config.yaml report.json output_vex.json
 
 ### Risk Context (`config.yaml`)
 
-Define your project's context and base OWASP risk factors:
+Define your project's context using simple hints. The LLM uses these to calculate accurate OWASP risk scores:
 
 ```yaml
 # vens - Vulnerability Risk Scoring Configuration
@@ -80,37 +81,40 @@ project:
   name: "nginx-production"
   description: "Production NGINX web server exposed to internet"
 
-# OWASP Risk Rating (0-9 scale for each factor)
+# Context hints for OWASP Risk Rating
 # Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
-owasp:
-  # === LIKELIHOOD (How probable is the attack?) ===
-  
-  threat_agent: 7
-  # Who might attack? Their skill, motivation, and opportunity
-  # 0-3: Script kiddies, opportunistic attacks
-  # 4-6: Skilled attackers, moderate resources
-  # 7-9: Organized crime, nation-states, APT groups
-  
-  vulnerability: 6
-  # How easy is it to find and exploit vulnerabilities?
-  # 0-3: Very difficult, requires insider knowledge
-  # 4-6: Public CVEs, some tools available
-  # 7-9: Trivial, automated scanners, known exploits
+context:
+  # How is the system exposed to potential attackers?
+  # Values: internal | private | internet
+  exposure: "internet"
 
-  # === IMPACT (What damage if successful?) ===
-  
-  technical_impact: 7
-  # Damage to systems, data, and infrastructure
-  # 0-3: Minor data disclosure, limited access
-  # 4-6: Significant data loss, service disruption
-  # 7-9: Complete system compromise, data destruction
-  
-  business_impact: 8
-  # Consequences for the business
-  # 0-3: Minimal financial/reputation loss
-  # 4-6: Moderate losses, customer complaints
-  # 7-9: Bankruptcy risk, regulatory fines, brand destruction
+  # What type of data does the system handle?
+  # Values: low | medium | high | critical
+  data_sensitivity: "high"
+
+  # How critical is this system for business operations?
+  # Values: low | medium | high | critical
+  business_criticality: "critical"
+
+  # Additional context (optional)
+  notes: "Handles customer PII, PCI-DSS compliance required"
 ```
+
+### Context Values Guide
+
+| Field | Value | Description |
+|-------|-------|-------------|
+| **exposure** | `internal` | Corporate network only, no external access |
+| | `private` | Requires VPN or authentication |
+| | `internet` | Publicly accessible |
+| **data_sensitivity** | `low` | Public data |
+| | `medium` | Internal data |
+| | `high` | PII, financial data |
+| | `critical` | Secrets, credentials, PHI |
+| **business_criticality** | `low` | Dev/test environments |
+| | `medium` | Internal tools |
+| | `high` | Customer-facing services |
+| | `critical` | Revenue-critical, compliance |
 
 ### LLM Backends
 
@@ -143,7 +147,7 @@ vens generate [flags] INPUT OUTPUT
 **Flags:**
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--config-file` | **(Required)** Path to `config.yaml` with OWASP factors | |
+| `--config-file` | **(Required)** Path to `config.yaml` with context hints | |
 | `--llm` | LLM backend (`openai`, `ollama`, `anthropic`, `googleai`) | `auto` |
 | `--llm-temperature` | Sampling temperature | `0.0` |
 | `--llm-batch-size` | Number of CVEs to process per request | `10` |

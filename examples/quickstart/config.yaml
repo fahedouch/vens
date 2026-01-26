@@ -5,41 +5,38 @@ project:
   name: "nginx-production"
   description: "Production NGINX web server exposed to internet"
 
-# OWASP Risk Rating (0-9 scale for each factor)
-# Final Risk = Likelihood × Impact
+# Context hints for OWASP Risk Rating
+# These hints help the LLM calculate accurate risk scores for each vulnerability
 # Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
 
-owasp:
-  # === LIKELIHOOD (How probable is the attack?) ===
-  
-  threat_agent: 7
-  # Who might attack? Their skill, motivation, and opportunity
-  # 0-3: Script kiddies, opportunistic attacks
-  # 4-6: Skilled attackers, moderate resources
-  # 7-9: Organized crime, nation-states, APT groups
-  
-  vulnerability: 6
-  # How easy is it to find and exploit vulnerabilities?
-  # 0-3: Very difficult, requires insider knowledge
-  # 4-6: Public CVEs, some tools available
-  # 7-9: Trivial, automated scanners, known exploits
+context:
+  # === EXPOSURE ===
+  # How is the system exposed to potential attackers?
+  # Values: internal | private | internet
+  #   - internal: Corporate network only, no external access
+  #   - private: Requires VPN or authentication to access
+  #   - internet: Publicly accessible from the internet
+  exposure: "internet"
 
-  # === IMPACT (What damage if successful?) ===
-  
-  technical_impact: 7
-  # Damage to systems, data, and infrastructure
-  # 0-3: Minor data disclosure, limited access
-  # 4-6: Significant data loss, service disruption
-  # 7-9: Complete system compromise, data destruction
-  
-  business_impact: 8
-  # Consequences for the business
-  # 0-3: Minimal financial/reputation loss
-  # 4-6: Moderate losses, customer complaints
-  # 7-9: Bankruptcy risk, regulatory fines, brand destruction
+  # === DATA SENSITIVITY ===
+  # What type of data does the system handle?
+  # Values: low | medium | high | critical
+  #   - low: Public data, no confidentiality requirements
+  #   - medium: Internal data, limited confidentiality
+  #   - high: PII, financial data, customer information
+  #   - critical: Secrets, credentials, PHI, payment card data
+  data_sensitivity: "high"
 
-# Calculated Risk Score Example:
-# Likelihood = (threat_agent + vulnerability) / 2 = (7 + 6) / 2 = 6.5
-# Impact = (technical_impact + business_impact) / 2 = (7 + 8) / 2 = 7.5
-# Risk = Likelihood × Impact = 6.5 × 7.5 = 48.75 / 81
-# Severity: CRITICAL (score > 40)
+  # === BUSINESS CRITICALITY ===
+  # How critical is this system for business operations?
+  # Values: low | medium | high | critical
+  #   - low: Development/test environments
+  #   - medium: Internal tools, non-essential services
+  #   - high: Customer-facing services, important operations
+  #   - critical: Revenue-critical, compliance-required, core business
+  business_criticality: "critical"
+
+  # === ADDITIONAL NOTES (optional) ===
+  # Free-form text to provide extra context for the LLM
+  # Examples: compliance requirements, specific threats, architecture details
+  notes: "Handles customer PII, PCI-DSS compliance required, serves as reverse proxy for backend APIs"

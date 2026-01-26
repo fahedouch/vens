@@ -17,12 +17,14 @@ package riskconfig
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"go.yaml.in/yaml/v3"
 )
 
 // Config represents the structure of config.yaml provided by users.
-// The schema follows OWASP Risk Rating Methodology with 4 base factors.
+// The schema uses textual context hints that help the LLM calculate
+// accurate OWASP risk scores for each vulnerability.
 //
 // Example YAML:
 //
@@ -30,17 +32,17 @@ import (
 //	  name: "nginx-production"
 //	  description: "Production NGINX web server"
 //
-//	owasp:
-//	  threat_agent: 7      # 0-9: Who might attack?
-//	  vulnerability: 6     # 0-9: How easy to exploit?
-//	  technical_impact: 7  # 0-9: Damage to systems?
-//	  business_impact: 8   # 0-9: Business consequences?
+//	context:
+//	  exposure: "internet"           # internal | private | internet
+//	  data_sensitivity: "high"       # low | medium | high | critical
+//	  business_criticality: "critical" # low | medium | high | critical
+//	  notes: "Handles customer PII, PCI-DSS compliance required"
 //
-// The LLM will evaluate how much each vulnerability contributes to these
-// base factors (as percentages), then compute the final weighted risk score.
+// The LLM uses these context hints to evaluate the OWASP risk score
+// for each vulnerability according to the OWASP Risk Rating Methodology.
 type Config struct {
 	Project ProjectConfig `yaml:"project"`
-	OWASP   OWASPFactors  `yaml:"owasp"`
+	Context ContextHints  `yaml:"context"`
 }
 
 // ProjectConfig holds project metadata for context in LLM analysis.
@@ -49,45 +51,37 @@ type ProjectConfig struct {
 	Description string `yaml:"description,omitempty"`
 }
 
-// OWASPFactors holds the 4 base OWASP risk factors (0-9 scale each).
+// ContextHints holds textual hints that describe the project's risk context.
+// These hints help the LLM calculate accurate OWASP risk scores.
 // Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
-//
-// Likelihood factors:
-//   - ThreatAgent: Skill, motivation, and opportunity of potential attackers
-//   - Vulnerability: Ease of discovery and exploitation
-//
-// Impact factors:
-//   - TechnicalImpact: Damage to systems, data, and infrastructure
-//   - BusinessImpact: Financial, reputation, and compliance consequences
-type OWASPFactors struct {
-	// === LIKELIHOOD FACTORS ===
+type ContextHints struct {
+	// Exposure describes how the system is exposed to potential attackers.
+	// Values: "internal" (corporate network only), "private" (VPN/authenticated),
+	//         "internet" (publicly accessible)
+	Exposure string `yaml:"exposure"`
 
-	// ThreatAgent represents who might attack (0-9)
-	// 0-3: Script kiddies, opportunistic attacks
-	// 4-6: Skilled attackers, moderate resources
-	// 7-9: Organized crime, nation-states, APT groups
-	ThreatAgent float64 `yaml:"threat_agent"`
+	// DataSensitivity describes the sensitivity of data handled by the system.
+	// Values: "low" (public data), "medium" (internal data),
+	//         "high" (PII, financial), "critical" (secrets, credentials, PHI)
+	DataSensitivity string `yaml:"data_sensitivity"`
 
-	// Vulnerability represents how easy it is to find and exploit (0-9)
-	// 0-3: Very difficult, requires insider knowledge
-	// 4-6: Public CVEs, some tools available
-	// 7-9: Trivial, automated scanners, known exploits
-	Vulnerability float64 `yaml:"vulnerability"`
+	// BusinessCriticality describes how critical the system is for business operations.
+	// Values: "low" (dev/test), "medium" (internal tools),
+	//         "high" (customer-facing), "critical" (revenue-critical, compliance)
+	BusinessCriticality string `yaml:"business_criticality"`
 
-	// === IMPACT FACTORS ===
-
-	// TechnicalImpact represents damage to systems (0-9)
-	// 0-3: Minor data disclosure, limited access
-	// 4-6: Significant data loss, service disruption
-	// 7-9: Complete system compromise, data destruction
-	TechnicalImpact float64 `yaml:"technical_impact"`
-
-	// BusinessImpact represents consequences for the business (0-9)
-	// 0-3: Minimal financial/reputation loss
-	// 4-6: Moderate losses, customer complaints
-	// 7-9: Bankruptcy risk, regulatory fines, brand destruction
-	BusinessImpact float64 `yaml:"business_impact"`
+	// Notes provides additional context in free-form text (optional).
+	// Examples: "PCI-DSS compliance required", "Handles authentication tokens",
+	//           "Connected to production database"
+	Notes string `yaml:"notes,omitempty"`
 }
+
+// Valid values for context hints
+var (
+	validExposure            = []string{"internal", "private", "internet"}
+	validDataSensitivity     = []string{"low", "medium", "high", "critical"}
+	validBusinessCriticality = []string{"low", "medium", "high", "critical"}
+)
 
 // Load parses a config.yaml file from the given path and validates entries.
 func Load(path string) (*Config, error) {
@@ -100,7 +94,7 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 
-	// Validate OWASP factors are in valid range [0, 9]
+	// Validate context hints
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
@@ -108,67 +102,61 @@ func Load(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-// validate checks that all OWASP factors are within the valid range [0, 9].
+// validate checks that all context hints have valid values.
 func (c *Config) validate() error {
-	factors := map[string]float64{
-		"threat_agent":     c.OWASP.ThreatAgent,
-		"vulnerability":    c.OWASP.Vulnerability,
-		"technical_impact": c.OWASP.TechnicalImpact,
-		"business_impact":  c.OWASP.BusinessImpact,
+	if c.Project.Name == "" {
+		return fmt.Errorf("project.name is required")
 	}
 
-	for name, value := range factors {
-		if !inRange09(value) {
-			return fmt.Errorf("OWASP factor %q must be between 0 and 9, got %.2f", name, value)
-		}
+	// Normalize values to lowercase
+	c.Context.Exposure = strings.ToLower(strings.TrimSpace(c.Context.Exposure))
+	c.Context.DataSensitivity = strings.ToLower(strings.TrimSpace(c.Context.DataSensitivity))
+	c.Context.BusinessCriticality = strings.ToLower(strings.TrimSpace(c.Context.BusinessCriticality))
+
+	if c.Context.Exposure == "" {
+		return fmt.Errorf("context.exposure is required (valid values: %v)", validExposure)
 	}
+	if !contains(validExposure, c.Context.Exposure) {
+		return fmt.Errorf("context.exposure must be one of %v, got %q", validExposure, c.Context.Exposure)
+	}
+
+	if c.Context.DataSensitivity == "" {
+		return fmt.Errorf("context.data_sensitivity is required (valid values: %v)", validDataSensitivity)
+	}
+	if !contains(validDataSensitivity, c.Context.DataSensitivity) {
+		return fmt.Errorf("context.data_sensitivity must be one of %v, got %q", validDataSensitivity, c.Context.DataSensitivity)
+	}
+
+	if c.Context.BusinessCriticality == "" {
+		return fmt.Errorf("context.business_criticality is required (valid values: %v)", validBusinessCriticality)
+	}
+	if !contains(validBusinessCriticality, c.Context.BusinessCriticality) {
+		return fmt.Errorf("context.business_criticality must be one of %v, got %q", validBusinessCriticality, c.Context.BusinessCriticality)
+	}
+
 	return nil
 }
 
-// ComputeBaseRisk calculates the base OWASP risk score without LLM adjustments.
-// Formula: Risk = Likelihood × Impact
-// Where: Likelihood = (ThreatAgent + Vulnerability) / 2
-//
-//	Impact = (TechnicalImpact + BusinessImpact) / 2
-//
-// Result is in range [0, 81] (9 × 9 max).
-func (c *Config) ComputeBaseRisk() float64 {
-	likelihood := (c.OWASP.ThreatAgent + c.OWASP.Vulnerability) / 2.0
-	impact := (c.OWASP.TechnicalImpact + c.OWASP.BusinessImpact) / 2.0
-	return likelihood * impact
+// FormatForLLM returns a formatted string representation of the context
+// suitable for inclusion in LLM prompts.
+func (c *Config) FormatForLLM() string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Project: %s\n", c.Project.Name))
+	if c.Project.Description != "" {
+		sb.WriteString(fmt.Sprintf("Description: %s\n", c.Project.Description))
+	}
+	sb.WriteString(fmt.Sprintf("Exposure: %s\n", c.Context.Exposure))
+	sb.WriteString(fmt.Sprintf("Data Sensitivity: %s\n", c.Context.DataSensitivity))
+	sb.WriteString(fmt.Sprintf("Business Criticality: %s\n", c.Context.BusinessCriticality))
+	if c.Context.Notes != "" {
+		sb.WriteString(fmt.Sprintf("Additional Notes: %s\n", c.Context.Notes))
+	}
+	return sb.String()
 }
 
-// ComputeWeightedRisk calculates the risk score adjusted by LLM contribution percentages.
-// Each contribution is a percentage (0.0 to 1.0) representing how much the specific
-// vulnerability contributes to each OWASP factor.
-//
-// Formula:
-//
-//	Likelihood = (ThreatAgent × threatAgentContrib + Vulnerability × vulnContrib) / 2
-//	Impact = (TechnicalImpact × techContrib + BusinessImpact × bizContrib) / 2
-//	Risk = Likelihood × Impact
-func (c *Config) ComputeWeightedRisk(contributions OWASPContributions) float64 {
-	weightedThreatAgent := c.OWASP.ThreatAgent * contributions.ThreatAgent
-	weightedVulnerability := c.OWASP.Vulnerability * contributions.Vulnerability
-	weightedTechnicalImpact := c.OWASP.TechnicalImpact * contributions.TechnicalImpact
-	weightedBusinessImpact := c.OWASP.BusinessImpact * contributions.BusinessImpact
-
-	likelihood := (weightedThreatAgent + weightedVulnerability) / 2.0
-	impact := (weightedTechnicalImpact + weightedBusinessImpact) / 2.0
-	return likelihood * impact
-}
-
-// OWASPContributions holds the LLM-evaluated contribution percentages for each factor.
-// Each value is a percentage between 0.0 (0%) and 1.0 (100%).
-type OWASPContributions struct {
-	ThreatAgent     float64 `json:"threat_agent_contribution"`
-	Vulnerability   float64 `json:"vulnerability_contribution"`
-	TechnicalImpact float64 `json:"technical_impact_contribution"`
-	BusinessImpact  float64 `json:"business_impact_contribution"`
-}
-
-// RiskSeverity returns a human-readable severity level based on the risk score.
+// RiskSeverity returns a human-readable severity level based on the OWASP risk score.
 // Based on OWASP Risk Rating: score range is [0, 81].
+// Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
 func RiskSeverity(score float64) string {
 	switch {
 	case score >= 60:
@@ -184,4 +172,11 @@ func RiskSeverity(score float64) string {
 	}
 }
 
-func inRange09(v float64) bool { return v >= 0 && v <= 9 }
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}

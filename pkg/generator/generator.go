@@ -52,13 +52,12 @@ type Vulnerability struct {
 }
 
 // llmOutputEntry represents the LLM response for a single vulnerability.
+// The LLM calculates the OWASP risk score directly based on context hints.
 type llmOutputEntry struct {
-	VulnID                      string  `json:"vulnId"`
-	ThreatAgentContribution     float64 `json:"threat_agent_contribution"`
-	VulnerabilityContribution   float64 `json:"vulnerability_contribution"`
-	TechnicalImpactContribution float64 `json:"technical_impact_contribution"`
-	BusinessImpactContribution  float64 `json:"business_impact_contribution"`
-	Reasoning                   string  `json:"reasoning"`
+	VulnID    string  `json:"vulnId"`
+	Score     float64 `json:"owasp_score"`
+	Severity  string  `json:"severity"`
+	Reasoning string  `json:"reasoning"`
 }
 
 // llmOutput wraps the array of results from LLM.
@@ -77,7 +76,7 @@ type Opts struct {
 	RetryOnRateLimit int
 	DebugDir         string
 
-	// Config carries user-provided OWASP base factors loaded from config.yaml.
+	// Config carries user-provided context hints loaded from config.yaml.
 	Config *riskconfig.Config
 }
 
@@ -114,8 +113,8 @@ func New(o Opts) (*Generator, error) {
 }
 
 // GenerateRiskScore generates contextual OWASP risk scores for the given vulnerabilities.
-// It uses the LLM to evaluate each vulnerability's contribution to the 4 OWASP factors,
-// then computes the final weighted risk score.
+// It uses the LLM to calculate the OWASP risk score for each vulnerability based on
+// the project context hints provided in config.yaml.
 func (g *Generator) GenerateRiskScore(ctx context.Context, vulns []Vulnerability, h func([]outputhandler.VulnRating) error) error {
 	batchSize := g.o.BatchSize
 	for i := 0; i < len(vulns); i += batchSize {
@@ -132,30 +131,30 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		return errors.New("config not initialized; load config.yaml first")
 	}
 
-	// Call LLM to evaluate OWASP contributions for each vulnerability
-	contributions, err := g.evaluateOWASPContributions(ctx, vulnBatch)
+	// Call LLM to calculate OWASP scores for each vulnerability
+	scores, err := g.evaluateOWASPScores(ctx, vulnBatch)
 	if err != nil {
 		return fmt.Errorf("LLM evaluation failed: %w", err)
 	}
 
-	// Build VulnRating group using computed weighted scores
+	// Build VulnRating group using LLM-computed scores
 	group := make([]outputhandler.VulnRating, 0, len(vulnBatch))
-	for vulnID, contrib := range contributions {
-		score := g.o.Config.ComputeWeightedRisk(contrib)
+	for _, entry := range scores {
+		if entry.VulnID == "" {
+			continue
+		}
+
+		score := clampScore(entry.Score)
 		severity := riskconfig.RiskSeverity(score)
 
 		slog.InfoContext(ctx, "vuln_risk_score",
-			"vuln", vulnID,
+			"vuln", entry.VulnID,
 			"score", fmt.Sprintf("%.2f", score),
 			"severity", severity,
-			"threat_agent_contrib", fmt.Sprintf("%.0f%%", contrib.ThreatAgent*100),
-			"vulnerability_contrib", fmt.Sprintf("%.0f%%", contrib.Vulnerability*100),
-			"technical_impact_contrib", fmt.Sprintf("%.0f%%", contrib.TechnicalImpact*100),
-			"business_impact_contrib", fmt.Sprintf("%.0f%%", contrib.BusinessImpact*100),
 		)
 
 		group = append(group, outputhandler.VulnRating{
-			VulnID: vulnID,
+			VulnID: entry.VulnID,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -173,9 +172,9 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 	return nil
 }
 
-// evaluateOWASPContributions calls the LLM to evaluate how each vulnerability
-// contributes to the 4 OWASP factors. Returns a map from VulnID to contributions.
-func (g *Generator) evaluateOWASPContributions(ctx context.Context, vulns []Vulnerability) (map[string]riskconfig.OWASPContributions, error) {
+// evaluateOWASPScores calls the LLM to calculate the OWASP risk score for each vulnerability.
+// The LLM uses the project context hints to determine the appropriate score.
+func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []Vulnerability) ([]llmOutputEntry, error) {
 	if g.o.LLM == nil {
 		return nil, errors.New("no LLM configured")
 	}
@@ -198,7 +197,7 @@ func (g *Generator) evaluateOWASPContributions(ctx context.Context, vulns []Vuln
 		callOpts = append(callOpts, llms.WithSeed(g.o.Seed))
 	}
 
-	// Build system prompt with OWASP context
+	// Build system prompt with context hints
 	systemPrompt := g.buildSystemPrompt()
 
 	// Build JSON schema for structured output
@@ -254,88 +253,88 @@ func (g *Generator) evaluateOWASPContributions(ctx context.Context, vulns []Vuln
 		return nil, fmt.Errorf("unable to parse LLM output: %w: %q", err, buf.String())
 	}
 
-	// Convert to map
-	result := make(map[string]riskconfig.OWASPContributions)
+	// Log reasoning for debugging
 	for _, r := range resp.Results {
-		if r.VulnID == "" {
-			continue
-		}
-		result[r.VulnID] = riskconfig.OWASPContributions{
-			ThreatAgent:     clampContribution(r.ThreatAgentContribution),
-			Vulnerability:   clampContribution(r.VulnerabilityContribution),
-			TechnicalImpact: clampContribution(r.TechnicalImpactContribution),
-			BusinessImpact:  clampContribution(r.BusinessImpactContribution),
-		}
 		slog.DebugContext(ctx, "llm_reasoning",
 			"vuln", r.VulnID,
+			"score", r.Score,
 			"reasoning", r.Reasoning,
 		)
 	}
 
-	return result, nil
+	return resp.Results, nil
 }
 
-// buildSystemPrompt creates the system prompt for OWASP contribution evaluation.
+// buildSystemPrompt creates the system prompt for OWASP score calculation.
+// Inspired by github.com/AkihiroSuda/vexllm prompt structure.
 func (g *Generator) buildSystemPrompt() string {
 	prompt := `You are a cybersecurity expert specialized in OWASP Risk Rating Methodology.
-Your mission is to evaluate how much each vulnerability contributes to the 4 OWASP risk factors.
+Your mission is to calculate the OWASP risk score for each vulnerability based on the project context.
+
+Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
+
+### OWASP Risk Rating Formula
+Risk = Likelihood × Impact
+
+Where:
+- Likelihood = (Threat Agent Factor + Vulnerability Factor) / 2
+- Impact = (Technical Impact + Business Impact) / 2
+
+Each factor is scored 0-9, so:
+- Likelihood range: 0-9
+- Impact range: 0-9
+- Final Risk Score range: 0-81
+
+### Severity Levels
+- CRITICAL: score >= 60
+- HIGH: score >= 40
+- MEDIUM: score >= 20
+- LOW: score >= 5
+- NOTE: score < 5
 
 ### Project Context
 `
 	if g.o.Config != nil {
-		prompt += fmt.Sprintf("- Project Name: %s\n", g.o.Config.Project.Name)
-		if g.o.Config.Project.Description != "" {
-			prompt += fmt.Sprintf("- Project Description: %s\n", g.o.Config.Project.Description)
-		}
-		prompt += fmt.Sprintf(`
-### Base OWASP Factors (defined by the project owner)
-- Threat Agent: %.1f/9 (Who might attack?)
-- Vulnerability: %.1f/9 (How easy to exploit?)
-- Technical Impact: %.1f/9 (Damage to systems?)
-- Business Impact: %.1f/9 (Business consequences?)
-`,
-			g.o.Config.OWASP.ThreatAgent,
-			g.o.Config.OWASP.Vulnerability,
-			g.o.Config.OWASP.TechnicalImpact,
-			g.o.Config.OWASP.BusinessImpact,
-		)
+		prompt += g.o.Config.FormatForLLM()
 	}
 
 	prompt += `
+### Context Interpretation Guide
+
+**Exposure:**
+- "internal": Low threat agent (2-3), attackers need internal access
+- "private": Medium threat agent (4-5), requires VPN/authentication
+- "internet": High threat agent (7-9), publicly accessible, APT targets
+
+**Data Sensitivity:**
+- "low": Low technical impact (1-3), public data only
+- "medium": Medium technical impact (4-5), internal data
+- "high": High technical impact (6-7), PII, financial data
+- "critical": Maximum technical impact (8-9), secrets, credentials, PHI
+
+**Business Criticality:**
+- "low": Low business impact (1-3), dev/test environments
+- "medium": Medium business impact (4-5), internal tools
+- "high": High business impact (6-7), customer-facing services
+- "critical": Maximum business impact (8-9), revenue-critical, compliance
+
 ### Your Task
-For each vulnerability in the input, evaluate how much it contributes to each OWASP factor as a percentage (0.0 to 1.0).
-
-**Contribution Guidelines:**
-
-1. **Threat Agent Contribution** (0.0-1.0):
-   - 0.9-1.0: Widely known vulnerability, public exploits available, actively targeted by APT groups
-   - 0.6-0.8: Known CVE, some exploit tools available, moderate attacker interest
-   - 0.3-0.5: Less known, requires specific knowledge to exploit
-   - 0.0-0.2: Obscure, rarely targeted
-
-2. **Vulnerability Contribution** (0.0-1.0):
-   - 0.9-1.0: Trivial to exploit, automated scanners detect it, POC exploits public
-   - 0.6-0.8: Moderate difficulty, requires some setup
-   - 0.3-0.5: Requires specific conditions or configuration
-   - 0.0-0.2: Very difficult, theoretical only
-
-3. **Technical Impact Contribution** (0.0-1.0):
-   - 0.9-1.0: RCE, complete system compromise, data destruction
-   - 0.6-0.8: Significant data access, privilege escalation
-   - 0.3-0.5: Limited data exposure, DoS
-   - 0.0-0.2: Minimal technical impact, information disclosure only
-
-4. **Business Impact Contribution** (0.0-1.0):
-   - 0.9-1.0: Critical business system, customer-facing, regulatory implications
-   - 0.6-0.8: Important internal system, moderate business disruption
-   - 0.3-0.5: Non-critical system, limited business impact
-   - 0.0-0.2: Test/dev system, negligible business impact
+For each vulnerability in the input:
+1. Analyze the CVE, severity, and affected package
+2. Consider the project context (exposure, data sensitivity, business criticality)
+3. Calculate the 4 OWASP factors (0-9 each):
+   - Threat Agent Factor: Based on exposure and vulnerability attractiveness
+   - Vulnerability Factor: Based on ease of discovery and exploitation
+   - Technical Impact: Based on data sensitivity and potential damage
+   - Business Impact: Based on business criticality and consequences
+4. Compute the final OWASP risk score (0-81)
+5. Determine the severity level
 
 ### Important Rules
-- Always provide a brief reasoning explaining your evaluation.
-- Consider the vulnerability type (RCE, DoS, XSS, SQLi, etc.) when evaluating.
-- Consider the affected library and its role in the project.
-- Be conservative: if unsure, lean towards higher contribution values.
+- Always provide a brief reasoning explaining your evaluation
+- Consider the vulnerability type (RCE, DoS, XSS, SQLi, etc.)
+- Consider the affected library and its role in the project
+- Be conservative: when in doubt, lean towards higher scores for internet-exposed systems
 
 ### Input Format
 The input is a JSON array of vulnerabilities with vulnId, pkgId, pkgName, title, description, and severity.
@@ -360,33 +359,23 @@ func (g *Generator) buildOutputSchema() *jsonschema.Definition {
 							Type:        jsonschema.String,
 							Description: "The vulnerability ID from the input (e.g., CVE-2024-1234)",
 						},
-						"threat_agent_contribution": {
+						"owasp_score": {
 							Type:        jsonschema.Number,
-							Description: "Contribution to Threat Agent factor (0.0-1.0)",
+							Description: "The calculated OWASP risk score (0-81)",
 						},
-						"vulnerability_contribution": {
-							Type:        jsonschema.Number,
-							Description: "Contribution to Vulnerability factor (0.0-1.0)",
-						},
-						"technical_impact_contribution": {
-							Type:        jsonschema.Number,
-							Description: "Contribution to Technical Impact factor (0.0-1.0)",
-						},
-						"business_impact_contribution": {
-							Type:        jsonschema.Number,
-							Description: "Contribution to Business Impact factor (0.0-1.0)",
+						"severity": {
+							Type:        jsonschema.String,
+							Description: "The severity level (CRITICAL, HIGH, MEDIUM, LOW, NOTE)",
 						},
 						"reasoning": {
 							Type:        jsonschema.String,
-							Description: "Brief explanation of the evaluation (2-3 sentences)",
+							Description: "Brief explanation of the score calculation (2-3 sentences)",
 						},
 					},
 					Required: []string{
 						"vulnId",
-						"threat_agent_contribution",
-						"vulnerability_contribution",
-						"technical_impact_contribution",
-						"business_impact_contribution",
+						"owasp_score",
+						"severity",
 						"reasoning",
 					},
 				},
@@ -402,31 +391,27 @@ func (g *Generator) buildOutputExample() string {
   "results": [
     {
       "vulnId": "CVE-2024-1234",
-      "threat_agent_contribution": 0.90,
-      "vulnerability_contribution": 0.85,
-      "technical_impact_contribution": 0.95,
-      "business_impact_contribution": 1.00,
-      "reasoning": "This is an RCE vulnerability in OpenSSL, widely known with public exploits. The affected library is a direct dependency of the web server exposed to the internet, making it critical for business operations."
+      "owasp_score": 56.25,
+      "severity": "HIGH",
+      "reasoning": "RCE vulnerability in OpenSSL on internet-exposed server (threat_agent=8, vuln=7). Handles high-sensitivity data (tech_impact=7) and is business-critical (biz_impact=8). Score: ((8+7)/2) × ((7+8)/2) = 7.5 × 7.5 = 56.25"
     },
     {
       "vulnId": "CVE-2024-5678",
-      "threat_agent_contribution": 0.40,
-      "vulnerability_contribution": 0.50,
-      "technical_impact_contribution": 0.30,
-      "business_impact_contribution": 0.20,
-      "reasoning": "This is a DoS vulnerability in an internal logging library. It requires specific network conditions and only affects availability, not confidentiality or integrity."
+      "owasp_score": 12.0,
+      "severity": "LOW",
+      "reasoning": "DoS vulnerability in logging library. Internal exposure reduces threat (threat_agent=3, vuln=4). Low data sensitivity (tech_impact=3) and medium business impact (biz_impact=4). Score: ((3+4)/2) × ((3+4)/2) = 3.5 × 3.5 = 12.25"
     }
   ]
 }`
 }
 
-// clampContribution ensures the contribution value is within [0.0, 1.0].
-func clampContribution(v float64) float64 {
+// clampScore ensures the score is within [0, 81].
+func clampScore(v float64) float64 {
 	if v < 0.0 {
 		return 0.0
 	}
-	if v > 1.0 {
-		return 1.0
+	if v > 81.0 {
+		return 81.0
 	}
 	return v
 }
