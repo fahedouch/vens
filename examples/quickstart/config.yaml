@@ -36,6 +36,51 @@ context:
   #   - critical: Revenue-critical, compliance-required, core business
   business_criticality: "critical"
 
+  # === AVAILABILITY REQUIREMENT (optional) ===
+  # How critical is system availability? Affects DoS/Availability vulnerability scores.
+  # Values: low | medium | high | critical
+  # Default: Inherits from business_criticality if not specified
+  # Uncomment and set explicitly if availability requirements differ from business criticality
+  # availability_requirement: "critical"
+
+  # === COMPLIANCE REQUIREMENTS (optional) ===
+  # List of regulatory/compliance frameworks that apply to this system.
+  # Used to increase business impact scores for compliance-related vulnerabilities.
+  # Supported frameworks: PCI-DSS, HIPAA, GDPR, SOC2, ISO27001, FISMA, FedRAMP
+  # Default: Empty (no compliance requirements)
+  # Uncomment and specify if compliance frameworks apply
+  # compliance_requirements:
+  #   - "PCI-DSS"
+  #   - "GDPR"
+
+  # === AUDIT REQUIREMENT (optional) ===
+  # How critical are audit logs and accountability? Affects accountability vulnerability scores.
+  # Values: low | medium | high
+  # Default: "low" if not specified
+  # Uncomment and set if audit/accountability is critical (e.g., financial systems)
+  # audit_requirement: "high"
+
+  # === SECURITY CONTROLS (optional) ===
+  # Specify which security controls are in place. These reduce vulnerability scores
+  # by making attacks harder to discover and exploit.
+  # All controls default to false (not present) if not specified.
+  # controls:
+  #   # Perimeter controls
+  #   waf: true                    # Web Application Firewall (blocks common attacks)
+  #   ddos_protection: false       # DDoS mitigation service
+  #
+  #   # Detection controls
+  #   ids: false                   # Intrusion Detection System
+  #   siem: false                  # Security Information & Event Management
+  #
+  #   # Endpoint controls
+  #   edr: false                   # Endpoint Detection & Response
+  #   antivirus: false             # Antivirus/Anti-malware
+  #
+  #   # Network controls
+  #   segmentation: false          # Network micro-segmentation
+  #   zero_trust: false            # Zero-trust architecture
+
   # === ADDITIONAL NOTES (optional) ===
   # Free-form text to provide extra context for the LLM
   # Examples: compliance requirements, specific threats, architecture details
