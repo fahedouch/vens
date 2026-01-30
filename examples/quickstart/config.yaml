@@ -7,8 +7,8 @@
 # Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
 
 project:
-  name: "nginx-production"
-  description: "Production NGINX web server exposed to internet"
+  name: "python-backend-api"
+  description: "Python 3.11 backend API service handling customer data"
 
 context:
   # ============================================================================
@@ -39,7 +39,7 @@ context:
   #   - high: Customer-facing services, important operations
   #   - critical: Revenue-critical, compliance-required, core business
   # Impact: Affects Business Impact score (all vulnerabilities)
-  business_criticality: "critical"
+  business_criticality: "high"
 
   # ============================================================================
   # OPTIONAL FIELDS - Provide additional context for precise scoring
@@ -50,47 +50,47 @@ context:
   # Default: Inherits from business_criticality if not specified
   # When to use: Set explicitly if availability needs differ from business criticality
   # Impact: Affects Technical Impact score for DoS/availability vulnerabilities
-  # availability_requirement: "critical"
+  availability_requirement: "high"
 
   # COMPLIANCE REQUIREMENTS: What regulations apply? (optional)
   # Supported: PCI-DSS, HIPAA, GDPR, SOC2, ISO27001, FISMA, FedRAMP, SOX, NIST, CCPA, CMMC, ITAR
   # Default: Empty (no compliance)
   # When to use: If non-compliance has legal/financial consequences
   # Impact: Increases Business Impact score for compliance-relevant vulnerabilities (+2)
-  # compliance_requirements:
-  #   - "PCI-DSS"
-  #   - "GDPR"
+  compliance_requirements:
+    - "GDPR"
+    - "SOC2"
 
   # AUDIT REQUIREMENT: How critical is audit logging? (optional)
   # Values: low | medium | high
   # Default: Not specified (accountability vulnerabilities scored lower)
   # When to use: Financial systems, compliance-critical systems requiring forensic logs
   # Impact: Affects Technical Impact score for accountability vulnerabilities
-  # audit_requirement: "high"
+  audit_requirement: "high"
 
   # SECURITY CONTROLS: What defenses are in place? (optional)
   # Default: All false (no controls assumed)
   # When to use: You have active security controls that reduce exploitability
   # Impact: Reduces Vulnerability score when controls block specific attack types
-  # controls:
-  #   # Perimeter controls
-  #   waf: true                    # Web Application Firewall (reduces web exploit scores)
-  #   ddos_protection: false       # DDoS mitigation (reduces DoS scores)
-  #
-  #   # Detection controls
-  #   ids: false                   # Intrusion Detection System (reduces network exploit scores)
-  #   siem: false                  # Security Information & Event Management
-  #
-  #   # Endpoint controls
-  #   edr: false                   # Endpoint Detection & Response (reduces malware scores)
-  #   antivirus: false             # Antivirus/Anti-malware
-  #
-  #   # Network controls
-  #   segmentation: false          # Network micro-segmentation (reduces lateral movement)
-  #   zero_trust: false            # Zero-trust architecture
+  controls:
+    # Perimeter controls
+    waf: true                    # Web Application Firewall (reduces web exploit scores)
+    ddos_protection: true        # DDoS mitigation (reduces DoS scores)
+
+    # Detection controls
+    ids: true                    # Intrusion Detection System (reduces network exploit scores)
+    siem: true                   # Security Information & Event Management
+
+    # Endpoint controls
+    edr: false                   # Endpoint Detection & Response (reduces malware scores)
+    antivirus: false             # Antivirus/Anti-malware
+
+    # Network controls
+    segmentation: true           # Network micro-segmentation (reduces lateral movement)
+    zero_trust: false            # Zero-trust architecture
 
   # ADDITIONAL NOTES: Free-form context (optional)
   # Default: Empty
   # When to use: Provide extra details that help understand risk (architecture, threat model, etc.)
   # Impact: Helps LLM make better decisions on edge cases
-  notes: "Handles customer PII, PCI-DSS compliance required, serves as reverse proxy for backend APIs"
+  notes: "Customer-facing REST API built with FastAPI/Flask running on Python 3.11-slim (Debian). Handles authentication, user data, and payment processing. Uses PostgreSQL database. Deployed in Kubernetes behind load balancer. Container runs as non-root user. SSL/TLS terminated at load balancer. Rate limiting and input validation implemented. Regular security patches applied monthly."
