@@ -165,6 +165,17 @@ func (c *Config) validate() error {
 		return fmt.Errorf("project.name is required")
 	}
 
+	// Validate required fields
+	if c.Context.Exposure == "" {
+		return fmt.Errorf("context.exposure is required (valid values: %v)", validExposure)
+	}
+	if c.Context.DataSensitivity == "" {
+		return fmt.Errorf("context.data_sensitivity is required (valid values: %v)", validDataSensitivity)
+	}
+	if c.Context.BusinessCriticality == "" {
+		return fmt.Errorf("context.business_criticality is required (valid values: %v)", validBusinessCriticality)
+	}
+
 	// Normalize required values to lowercase
 	c.Context.Exposure = strings.ToLower(strings.TrimSpace(c.Context.Exposure))
 	c.Context.DataSensitivity = strings.ToLower(strings.TrimSpace(c.Context.DataSensitivity))
@@ -180,23 +191,12 @@ func (c *Config) validate() error {
 		c.Context.AuditRequirement = &normalized
 	}
 
-	// Validate required fields
-	if c.Context.Exposure == "" {
-		return fmt.Errorf("context.exposure is required (valid values: %v)", validExposure)
-	}
+	// Validate normalized values against valid options
 	if !contains(validExposure, c.Context.Exposure) {
 		return fmt.Errorf("context.exposure must be one of %v, got %q", validExposure, c.Context.Exposure)
 	}
-
-	if c.Context.DataSensitivity == "" {
-		return fmt.Errorf("context.data_sensitivity is required (valid values: %v)", validDataSensitivity)
-	}
 	if !contains(validDataSensitivity, c.Context.DataSensitivity) {
 		return fmt.Errorf("context.data_sensitivity must be one of %v, got %q", validDataSensitivity, c.Context.DataSensitivity)
-	}
-
-	if c.Context.BusinessCriticality == "" {
-		return fmt.Errorf("context.business_criticality is required (valid values: %v)", validBusinessCriticality)
 	}
 	if !contains(validBusinessCriticality, c.Context.BusinessCriticality) {
 		return fmt.Errorf("context.business_criticality must be one of %v, got %q", validBusinessCriticality, c.Context.BusinessCriticality)

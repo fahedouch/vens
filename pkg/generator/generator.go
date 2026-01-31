@@ -189,10 +189,6 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 
 // evaluateOWASPScores calls the LLM to calculate the OWASP risk score for each vulnerability.
 // The LLM uses the project context hints to determine the appropriate score.
-//
-// TODO: Optimization opportunity - Only ThreatAgent, TechnicalImpact, and BusinessImpact can be calculated
-// deterministically from config. Consider moving them to Go code and using LLM only for VulnerabilityScore
-// (which requires analyzing CVE descriptions). This would reduce costs by ~66% and improve consistency.
 func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []Vulnerability) ([]llmOutputEntry, error) {
 	if g.o.LLM == nil {
 		return nil, errors.New("no LLM configured")

@@ -3,7 +3,7 @@
 #
 # This config provides context for OWASP Risk Rating of vulnerabilities.
 # The LLM scores EACH vulnerability based on its specific characteristics
-# within YOUR system context (not a direct mapping from context to score).
+# within YOUR system context.
 # Reference: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology
 
 project:
