@@ -1,5 +1,12 @@
 # vens - Context-Aware Vulnerability Risk Scoring
 
+[![GitHub Release][release-img]][release]
+[![Test][test-img]][test]
+[![Go Report Card][go-report-img]][go-report]
+[![License: Apache-2.0][license-img]][license]
+[![GitHub Downloads][github-downloads-img]][release]
+![Docker Pulls][docker-pulls]
+
 **Stop treating all vulnerabilities equally.** Vens transforms generic CVSS scores into **contextual OWASP risk scores** tailored to YOUR system using LLM intelligence.
 
 ## Why vens?
@@ -132,3 +139,14 @@ Apache License 2.0 - See [LICENSE](LICENSE)
 ---
 
 **Focus on what matters. Patch smarter, not harder.**
+
+[test]: https://github.com/fahedouch/vens/actions/workflows/main.yml
+[test-img]: https://github.com/fahedouch/vens/actions/workflows/main.yml/badge.svg
+[go-report]: https://goreportcard.com/report/github.com/fahedouch/vens
+[go-report-img]: https://goreportcard.com/badge/github.com/fahedouch/vens
+[release]: https://github.com/fahedouch/vens/releases
+[release-img]: https://img.shields.io/github/release/fahedouch/vens.svg?logo=github
+[github-downloads-img]: https://img.shields.io/github/downloads/fahedouch/vens/total?logo=github
+[docker-pulls]: https://img.shields.io/docker/pulls/fahedouch/vens?logo=docker&label=docker%20pulls%20%2F%20vens
+[license]: https://github.com/fahedouch/vens/blob/main/LICENSE
+[license-img]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
