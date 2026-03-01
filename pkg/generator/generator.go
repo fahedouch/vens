@@ -43,13 +43,30 @@ const (
 )
 
 // Vulnerability represents a single vulnerability from a scanner report.
+// Contains all fields needed for VEX generation.
 type Vulnerability struct {
-	VulnID      string `json:"vulnId"`
-	PkgID       string `json:"pkgId"`
-	PkgName     string `json:"pkgName"`
-	Title       string `json:"title"`
-	Description string `json:"description,omitempty"`
-	Severity    string `json:"severity,omitempty"`
+	VulnID           string
+	PkgID            string
+	PkgName          string
+	InstalledVersion string
+	FixedVersion     string
+	BOMRef           string // CycloneDX BOM-Ref (calculated using Trivy's logic)
+	Title            string
+	Description      string
+	Severity         string // NVD/vendor severity
+}
+
+// LLMVulnerability contains only the fields needed for LLM analysis.
+// This is sent to the LLM to minimize token usage.
+type LLMVulnerability struct {
+	VulnID           string `json:"vulnId"`
+	PkgID            string `json:"pkgId"`
+	PkgName          string `json:"pkgName"`
+	InstalledVersion string `json:"installedVersion,omitempty"`
+	FixedVersion     string `json:"fixedVersion,omitempty"`
+	Title            string `json:"title"`
+	Description      string `json:"description,omitempty"`
+	Severity         string `json:"severity,omitempty"` // NVD/vendor severity as context
 }
 
 // llmOutputEntry represents the LLM response for a single vulnerability.
@@ -135,8 +152,24 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		return errors.New("config not initialized; load config.yaml first")
 	}
 
+	vulnMap := make(map[string]Vulnerability, len(vulnBatch))
+	llmBatch := make([]LLMVulnerability, len(vulnBatch))
+	for i, v := range vulnBatch {
+		vulnMap[v.VulnID] = v
+		llmBatch[i] = LLMVulnerability{
+			VulnID:           v.VulnID,
+			PkgID:            v.PkgID,
+			PkgName:          v.PkgName,
+			InstalledVersion: v.InstalledVersion,
+			FixedVersion:     v.FixedVersion,
+			Title:            v.Title,
+			Description:      v.Description,
+			Severity:         v.Severity,
+		}
+	}
+
 	// Call LLM to calculate OWASP scores for each vulnerability
-	scores, err := g.evaluateOWASPScores(ctx, vulnBatch)
+	scores, err := g.evaluateOWASPScores(ctx, llmBatch)
 	if err != nil {
 		return fmt.Errorf("LLM evaluation failed: %w", err)
 	}
@@ -166,21 +199,23 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 		)
 		vectorString := vector.String()
 
-		slog.InfoContext(ctx, "vuln_risk_score",
+		// Get the BOMRef from the original vulnerability
+		bomRef := ""
+		if vuln, ok := vulnMap[entry.VulnID]; ok {
+			bomRef = vuln.BOMRef
+		}
+
+		slog.InfoContext(ctx, "Scored vulnerability",
 			"vuln", entry.VulnID,
-			"threat_agent", entry.ThreatAgentScore,
-			"vulnerability", entry.VulnerabilityScore,
-			"technical_impact", entry.TechnicalImpact,
-			"business_impact", entry.BusinessImpact,
-			"likelihood", fmt.Sprintf("%.2f", likelihoodScore),
-			"impact", fmt.Sprintf("%.2f", impactScore),
-			"score", fmt.Sprintf("%.2f", score),
+			"pkg", bomRef,
+			"score", fmt.Sprintf("%.1f", score),
 			"severity", severity,
 			"vector", vectorString,
 		)
 
 		group = append(group, outputhandler.VulnRating{
 			VulnID: entry.VulnID,
+			BOMRef: bomRef,
 			Rating: cyclonedx.VulnerabilityRating{
 				Method:   cyclonedx.ScoringMethodOWASP,
 				Score:    &score,
@@ -201,7 +236,7 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 
 // evaluateOWASPScores calls the LLM to calculate the OWASP risk score for each vulnerability.
 // The LLM uses the project context hints to determine the appropriate score.
-func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []Vulnerability) ([]llmOutputEntry, error) {
+func (g *Generator) evaluateOWASPScores(ctx context.Context, vulns []LLMVulnerability) ([]llmOutputEntry, error) {
 	if g.o.LLM == nil {
 		return nil, errors.New("no LLM configured")
 	}

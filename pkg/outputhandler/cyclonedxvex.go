@@ -15,19 +15,29 @@
 package outputhandler
 
 import (
+	"fmt"
 	"io"
+	"log/slog"
 
 	"github.com/CycloneDX/cyclonedx-go"
 )
 
 // NewCycloneDxVexOutputHandler returns an OutputHandler that accumulates
 // vulnerability ratings and emits a proper CycloneDX VEX BOM on Close.
-func NewCycloneDxVexOutputHandler(w io.Writer) OutputHandler { return &cycloneDxVexWriter{w: w} }
+func NewCycloneDxVexOutputHandler(w io.Writer, sbomUUID string, sbomVersion int) OutputHandler {
+	return &cycloneDxVexWriter{
+		w:           w,
+		sbomUUID:    sbomUUID,
+		sbomVersion: sbomVersion,
+	}
+}
 
 type cycloneDxVexWriter struct {
-	w      io.Writer
-	r      []VulnRating
-	closed bool
+	w           io.Writer
+	r           []VulnRating
+	sbomUUID    string // SBOM UUID (without urn:uuid: prefix) for BOM-Link reference
+	sbomVersion int    // SBOM version for BOM-Link
+	closed      bool
 }
 
 func (c *cycloneDxVexWriter) HandleVulnRatings(vr []VulnRating) error {
@@ -47,14 +57,27 @@ func (c *cycloneDxVexWriter) Close() error {
 
 	vulns := make([]cyclonedx.Vulnerability, 0, len(c.r))
 	for _, g := range c.r {
+		if g.BOMRef == "" {
+			slog.Warn("Skipping vulnerability without BOMRef",
+				"vuln", g.VulnID,
+			)
+			continue
+		}
+
 		rs := []cyclonedx.VulnerabilityRating{g.Rating}
 		v := cyclonedx.Vulnerability{
 			ID:      g.VulnID,
 			Ratings: &rs,
 		}
-		if g.AffectedRef != "" {
-			v.Affects = &[]cyclonedx.Affects{{Ref: g.AffectedRef}}
+
+		// Construct BOM-Link according to CycloneDX spec: urn:cdx:{uuid}/version#bom-ref
+		bomLink := fmt.Sprintf("urn:cdx:%s/%d#%s", c.sbomUUID, c.sbomVersion, g.BOMRef)
+
+		affects := cyclonedx.Affects{
+			Ref: bomLink,
 		}
+		v.Affects = &[]cyclonedx.Affects{affects}
+
 		vulns = append(vulns, v)
 	}
 

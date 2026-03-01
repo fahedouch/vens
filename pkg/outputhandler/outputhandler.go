@@ -28,7 +28,7 @@ type OutputHandler interface {
 
 // VulnRating carries a single CycloneDX rating for one vulnerability ID.
 type VulnRating struct {
-	VulnID      string
-	AffectedRef string
-	Rating      cyclonedx.VulnerabilityRating
+	VulnID string
+	BOMRef string // CycloneDX BOM-Ref (calculated using Trivy's logic)
+	Rating cyclonedx.VulnerabilityRating
 }
