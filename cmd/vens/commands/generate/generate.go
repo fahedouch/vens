@@ -21,14 +21,18 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	trivytypes "github.com/aquasecurity/trivy/pkg/types"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/venslabs/vens/pkg/generator"
 	"github.com/venslabs/vens/pkg/llm"
 	"github.com/venslabs/vens/pkg/llm/llmfactory"
 	outputhandler "github.com/venslabs/vens/pkg/outputhandler"
 	"github.com/venslabs/vens/pkg/riskconfig"
+	"github.com/venslabs/vens/pkg/sbom"
 	"github.com/venslabs/vens/pkg/trivypluginutil"
 )
 
@@ -62,6 +66,8 @@ The LLM calculates the OWASP risk score (0-81) for each vulnerability using:
 	flags.String("input-format", "auto", "Input format ([auto trivy])")
 	flags.String("output-format", "auto", "Output format ([auto cyclonedxvex])")
 	flags.String("debug-dir", "", "Directory to save debug files (prompts, responses)")
+	flags.String("sbom-serial-number", "", "SBOM serial number for BOM-Link (format: urn:uuid:...)")
+	flags.Int("sbom-version", 1, "SBOM version for BOM-Link (default: 1)")
 
 	return cmd
 }
@@ -198,24 +204,41 @@ func action(cmd *cobra.Command, args []string) error {
 		slog.DebugContext(ctx, "Automatically choosing output format", "format", outputFormat)
 	}
 
+	sbomUUID, sbomVersion, err := extractSBOMMetadata(flags)
+	if err != nil {
+		return fmt.Errorf("failed to extract SBOM metadata: %w", err)
+	}
+
 	switch outputFormat {
 	case "cyclonedxvex":
-		h = outputhandler.NewCycloneDxVexOutputHandler(outputW)
+		h = outputhandler.NewCycloneDxVexOutputHandler(outputW, sbomUUID, sbomVersion)
 	default:
 		return fmt.Errorf("unknown output format %q", outputFormat)
 	}
 
-	// Convert Trivy vulnerabilities to generator format
+	purlCounts := make(map[string]int)
 	var vulns []generator.Vulnerability
+
 	for _, result := range input.Results {
 		for _, v := range result.Vulnerabilities {
+			if v.PkgIdentifier.PURL != nil {
+				purl := v.PkgIdentifier.PURL.ToString()
+				purlCounts[purl]++
+			}
+
+			// Calculate BOMRef using Trivy's logic
+			bomRef := sbom.CalculateBOMRef(v.PkgIdentifier, v.PkgID, purlCounts)
+
 			vulns = append(vulns, generator.Vulnerability{
-				VulnID:      v.VulnerabilityID,
-				PkgID:       v.PkgID,
-				PkgName:     v.PkgName,
-				Title:       v.Title,
-				Description: v.Description,
-				Severity:    v.Severity,
+				VulnID:           v.VulnerabilityID,
+				PkgID:            v.PkgID,
+				PkgName:          v.PkgName,
+				InstalledVersion: v.InstalledVersion,
+				FixedVersion:     v.FixedVersion,
+				BOMRef:           bomRef,
+				Title:            v.Title,
+				Description:      v.Description,
+				Severity:         v.Severity,
 			})
 		}
 	}
@@ -236,4 +259,32 @@ func action(cmd *cobra.Command, args []string) error {
 	}
 
 	return h.Close()
+}
+
+// extractSBOMMetadata extracts UUID and version from flags.
+// Returns the raw UUID string without urn:uuid: prefix.
+func extractSBOMMetadata(flags *pflag.FlagSet) (sbomUUID string, version int, err error) {
+	sbomSerialNumber, _ := flags.GetString("sbom-serial-number")
+	sbomVersion, _ := flags.GetInt("sbom-version")
+
+	if sbomSerialNumber == "" {
+		return "", 0, fmt.Errorf("sbom-serial-number is required")
+	}
+
+	// Validate format: must start with urn:uuid:
+	if !strings.HasPrefix(sbomSerialNumber, "urn:uuid:") {
+		return "", 0, fmt.Errorf("sbom-serial-number must start with 'urn:uuid:' (got: %s)", sbomSerialNumber)
+	}
+
+	// Extract and validate UUID part
+	uuidStr := strings.TrimPrefix(sbomSerialNumber, "urn:uuid:")
+	if _, err := uuid.Parse(uuidStr); err != nil {
+		return "", 0, fmt.Errorf("invalid UUID in sbom-serial-number: %w", err)
+	}
+
+	if sbomVersion == 0 {
+		sbomVersion = 1
+	}
+
+	return uuidStr, sbomVersion, nil
 }
