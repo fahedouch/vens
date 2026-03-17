@@ -24,7 +24,7 @@ vens generate \
 vens generate \
   --config-file config.yaml \
   --llm openai \
-  reports/nginx.grype.json \
+  reports/python-slim-grype.json \
   output_vex.cdx.json
 ```
 

@@ -163,25 +163,25 @@ func action(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to read input file: %w", err)
 	}
 
-	// Determine parser
+	// Detect scanner format
 	inputFormat, err := flags.GetString("input-format")
 	if err != nil {
 		return err
 	}
 
-	var parser scanner.ReportParser
+	var reportScanner scanner.ReportScanner
 	if inputFormat == "" || inputFormat == "auto" {
 		// Auto-detect format
-		parser, err = scanner.DetectFormat(inputB)
+		reportScanner, err = scanner.DetectFormat(inputB)
 		if err != nil {
 			return fmt.Errorf("failed to detect input format: %w", err)
 		}
-		slog.InfoContext(ctx, "Auto-detected input format", "format", parser.Name())
+		slog.InfoContext(ctx, "Auto-detected input format", "format", reportScanner.Name())
 	} else {
 		// Use explicit format
-		parser, err = scanner.NewParser(scanner.ScannerType(inputFormat))
+		reportScanner, err = scanner.NewScanner(scanner.ScannerType(inputFormat))
 		if err != nil {
-			return fmt.Errorf("failed to create parser: %w", err)
+			return fmt.Errorf("failed to create scanner: %w", err)
 		}
 		slog.DebugContext(ctx, "Using explicit input format", "format", inputFormat)
 	}
@@ -216,8 +216,8 @@ func action(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unknown output format %q", outputFormat)
 	}
 
-	// Parse vulnerabilities using the appropriate parser
-	vulns, err := parser.Parse(inputB)
+	// Parse vulnerabilities
+	vulns, err := reportScanner.Parse(inputB)
 	if err != nil {
 		return fmt.Errorf("failed to parse vulnerabilities: %w", err)
 	}
