@@ -18,8 +18,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"time"
 
 	"github.com/CycloneDX/cyclonedx-go"
+	"github.com/google/uuid"
+	"github.com/venslabs/vens/cmd/vens/version"
 )
 
 // NewCycloneDxVexOutputHandler returns an OutputHandler that accumulates
@@ -55,6 +58,24 @@ func (c *cycloneDxVexWriter) Close() error {
 	// Build a CycloneDX VEX with vulnerabilities and dedicated rating
 	bom := cyclonedx.NewBOM()
 
+	// Set VEX BOM serial number (distinct from the SBOM serial number)
+	bom.SerialNumber = "urn:uuid:" + uuid.New().String()
+	bom.Version = 1
+
+	// Set metadata with timestamp and tool information
+	bom.Metadata = &cyclonedx.Metadata{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Tools: &cyclonedx.ToolsChoice{
+			Components: &[]cyclonedx.Component{
+				{
+					Type:    cyclonedx.ComponentTypeApplication,
+					Name:    "vens",
+					Version: version.GetVersion(),
+				},
+			},
+		},
+	}
+
 	vulns := make([]cyclonedx.Vulnerability, 0, len(c.r))
 	for _, g := range c.r {
 		if g.BOMRef == "" {
@@ -67,6 +88,7 @@ func (c *cycloneDxVexWriter) Close() error {
 		rs := []cyclonedx.VulnerabilityRating{g.Rating}
 		v := cyclonedx.Vulnerability{
 			ID:      g.VulnID,
+			Source:  g.Source,
 			Ratings: &rs,
 		}
 

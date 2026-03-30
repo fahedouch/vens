@@ -54,6 +54,8 @@ type Vulnerability struct {
 	Title            string
 	Description      string
 	Severity         string // NVD/vendor severity
+	SourceName       string // Source database name (e.g., "NVD", "GITHUB", "OSV") from scanner
+	SourceURL        string // Source database URL from scanner
 }
 
 // LLMVulnerability contains only the fields needed for LLM analysis.
@@ -213,6 +215,17 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 			"vector", vectorString,
 		)
 
+		// Determine vulnerability source: prefer scanner-provided, fallback to ID-based inference
+		var source *cyclonedx.Source
+		if vuln, ok := vulnMap[entry.VulnID]; ok && vuln.SourceName != "" {
+			source = &cyclonedx.Source{
+				Name: vuln.SourceName,
+				URL:  vuln.SourceURL,
+			}
+		} else {
+			source = outputhandler.VulnSource(entry.VulnID)
+		}
+
 		group = append(group, outputhandler.VulnRating{
 			VulnID: entry.VulnID,
 			BOMRef: bomRef,
@@ -222,6 +235,7 @@ func (g *Generator) generateRiskScore(ctx context.Context, vulnBatch []Vulnerabi
 				Severity: cyclonedx.Severity(severity),
 				Vector:   vectorString,
 			},
+			Source: source,
 		})
 	}
 
