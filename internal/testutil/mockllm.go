@@ -24,16 +24,12 @@ import (
 	"github.com/tmc/langchaingo/llms"
 )
 
-// MockLLM implements llms.Model for testing purposes.
-// It returns deterministic OWASP scores based on vulnerability IDs.
 type MockLLM struct{}
 
-// NewMockLLM creates a new mock LLM for testing.
 func NewMockLLM() *MockLLM {
 	return &MockLLM{}
 }
 
-// llmOutputEntry mirrors the structure in generator.go
 type llmOutputEntry struct {
 	VulnID             string  `json:"vulnId"`
 	ThreatAgentScore   float64 `json:"threat_agent_score"`
@@ -47,10 +43,7 @@ type llmOutput struct {
 	Results []llmOutputEntry `json:"results"`
 }
 
-// GenerateContent implements llms.Model.
-// It parses vulnerability IDs from the input and returns deterministic scores.
 func (m *MockLLM) GenerateContent(ctx context.Context, messages []llms.MessageContent, options ...llms.CallOption) (*llms.ContentResponse, error) {
-	// Extract vulnerability IDs from the human message (last message)
 	var vulnIDs []string
 	for _, msg := range messages {
 		if msg.Role == llms.ChatMessageTypeHuman {
@@ -62,7 +55,6 @@ func (m *MockLLM) GenerateContent(ctx context.Context, messages []llms.MessageCo
 		}
 	}
 
-	// Generate deterministic scores for each vulnerability
 	results := make([]llmOutputEntry, 0, len(vulnIDs))
 	for _, vulnID := range vulnIDs {
 		scores := deterministicScores(vulnID)
@@ -82,7 +74,6 @@ func (m *MockLLM) GenerateContent(ctx context.Context, messages []llms.MessageCo
 		return nil, err
 	}
 
-	// Call streaming function if provided (required by generator.go)
 	opts := llms.CallOptions{}
 	for _, opt := range options {
 		opt(&opts)
@@ -102,7 +93,6 @@ func (m *MockLLM) GenerateContent(ctx context.Context, messages []llms.MessageCo
 	}, nil
 }
 
-// Call implements llms.Model (simple text interface).
 func (m *MockLLM) Call(ctx context.Context, prompt string, options ...llms.CallOption) (string, error) {
 	resp, err := m.GenerateContent(ctx, []llms.MessageContent{
 		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
@@ -116,7 +106,6 @@ func (m *MockLLM) Call(ctx context.Context, prompt string, options ...llms.CallO
 	return resp.Choices[0].Content, nil
 }
 
-// extractVulnIDs extracts vulnerability IDs from JSON input.
 var vulnIDRegex = regexp.MustCompile(`"vulnId"\s*:\s*"([^"]+)"`)
 
 func extractVulnIDs(text string) []string {
@@ -130,16 +119,12 @@ func extractVulnIDs(text string) []string {
 	return ids
 }
 
-// deterministicScores generates consistent scores based on vuln ID.
-// This ensures tests are reproducible.
 func deterministicScores(vulnID string) [4]float64 {
-	// Use a simple hash of the vulnerability ID
 	hash := 0
 	for _, c := range vulnID {
 		hash = hash*31 + int(c)
 	}
 
-	// Extract numeric part if available (e.g., "2024" from "CVE-2024-1234")
 	numRegex := regexp.MustCompile(`\d+`)
 	nums := numRegex.FindAllString(vulnID, -1)
 	if len(nums) > 0 {
@@ -148,8 +133,7 @@ func deterministicScores(vulnID string) [4]float64 {
 		}
 	}
 
-	// Generate 4 scores in range [3, 8] for realistic testing
-	base := float64((hash % 6) + 3) // 3-8
+	base := float64((hash % 6) + 3)
 	return [4]float64{
 		clamp(base),
 		clamp(base + 1),

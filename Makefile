@@ -21,10 +21,6 @@ test:
 test-integration:
 	$(GO) test -v ./cmd/vens/... -run TestScript
 
-.PHONY: update-test-scripts
-update-test-scripts:
-	VENS_UPDATE_SCRIPTS=1 $(GO) test -v ./cmd/vens/... -run TestScript
-
 .PHONY: _output/bin/vens
 _output/bin/vens:
 	$(GO_BUILD) -o $@ ./cmd/vens
