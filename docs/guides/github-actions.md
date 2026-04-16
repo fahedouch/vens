@@ -71,6 +71,7 @@ Pre-install the vens binary and pass `bin-path`:
     sbom-serial-number: ${{ vars.SBOM_SERIAL }}
     llm-provider: ollama
     llm-base-url: http://ollama.corp.example:11434
+    llm-model: llama3.1
 ```
 
 ## For details
