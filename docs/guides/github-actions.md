@@ -32,6 +32,8 @@ Add this to your workflow after a container or dependency scan:
       ${{ steps.vens.outputs.enriched-report }}
 ```
 
+For tighter supply-chain control, pin by commit SHA instead of the mutable tag: `uses: venslabs/vens-action@5e8b440b...  # v0.1.0`. Dependabot and Renovate both track SHA-pinned actions.
+
 ## About vens-action
 
 The action wraps the [vens CLI](../reference/generate.md). It expects a Trivy or Grype JSON report, your `config.yaml`, and an LLM provider API key. It outputs a VEX file and severity counts you can use to fail the build.
