@@ -64,6 +64,9 @@ Vens reads your scanner report, combines it with _your_ system context (exposure
 - :material-arrow-collapse-right: **[Enrich your report](reference/enrich.md)**
   Fold OWASP scores back into your Trivy report.
 
+- :material-github: **[GitHub Actions](guides/github-actions.md)**
+  Drop vens into your CI pipeline.
+
 </div>
 
 ---
