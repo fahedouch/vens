@@ -40,6 +40,8 @@ The action wraps the [vens CLI](../reference/generate.md). It expects a Trivy or
 
 Key difference from running `vens generate` directly: the action handles binary installation (from a release tag or pre-installed path), extracts `sbom-serial-number` for BOM-Link anchoring, and exposes counts as workflow outputs for downstream steps.
 
+The `llm-api-key` is passed as an environment variable (never a CLI argument) and masked in workflow logs via `::add-mask::` before any step runs.
+
 ## Using the mock provider in CI
 
 For testing or cost savings, use the `mock` LLM provider — it returns fixed scores and costs nothing:
