@@ -150,11 +150,11 @@ Grype supports `--vex` as well. Dependency-Track can ingest the VEX file directl
 
 ## Put it in CI
 
-A typical GitHub Actions step:
+For a turnkey Action, see [GitHub Actions integration](github-actions.md). The manual approach below works too:
 
 ```yaml
 - name: Install Vens
-  run: go install github.com/venslabs/vens/cmd/vens@v0.3.0
+  run: go install github.com/venslabs/vens/cmd/vens@v0.3.2
 
 - name: Scan image
   run: trivy image $IMAGE --format json --output report.json
