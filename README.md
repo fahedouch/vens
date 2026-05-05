@@ -36,13 +36,27 @@ Risk = Likelihood × Impact (0-81 scale)
 
 ## Installation
 
-**Standalone:**
-```bash
-go install github.com/venslabs/vens/cmd/vens@latest
+**[GitHub Action](https://github.com/marketplace/actions/vens-action):**
+```yaml
+- uses: venslabs/vens-action@v0.1.0   # check the marketplace for the latest tag
+  with:
+    config-file: .vens/config.yaml
+    input-report: report.json
+    sbom-serial-number: ${{ vars.SBOM_SERIAL }}
+    llm-provider: openai
+    llm-model: gpt-4o
+    llm-api-key: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-**[Trivy Plugin](https://trivy.dev/docs/latest/plugin/):**
+See the [GitHub Actions guide](https://venslabs.github.io/vens/guides/github-actions/) for the full input/output reference.
+
+**Run Vens locally:**
+
 ```bash
+# Go install
+go install github.com/venslabs/vens/cmd/vens@latest
+
+# Or as a Trivy plugin (https://trivy.dev/docs/latest/plugin/)
 trivy plugin install github.com/venslabs/vens
 ```
 
