@@ -14,14 +14,16 @@ If you scan with Trivy or Grype in GitHub Actions, drop [`venslabs/vens-action`]
   run: trivy image python:3.11-slim --format json --output report.json
 
 - name: Prioritize with vens
-  uses: venslabs/vens-action@v0.1.0   # check the marketplace for the latest tag
+  uses: venslabs/vens-action@v0.1.0   # check the marketplace for the latest tag; pin by SHA in production
   with:
-    config-file: .vens/config.yaml
+    version: v0.3.2                   # vens binary version
+    config-file: .vens/config.yaml    # see ../guides/configuration.md to author this file
     input-report: report.json
     sbom-serial-number: ${{ vars.SBOM_SERIAL }}
     llm-provider: openai
     llm-model: gpt-4o
     llm-api-key: ${{ secrets.OPENAI_API_KEY }}
+    fail-on-severity: critical        # break the build on critical OWASP risk
 ```
 
 The action installs the binary, runs `vens generate`, and exposes severity counts as workflow outputs you can fail the build on. Full input/output reference, air-gapped runners, and the mock provider: see the **[GitHub Actions integration guide](../guides/github-actions.md)**.
@@ -182,7 +184,11 @@ Auto-detection currently defaults to **OpenAI**. If you use a different provider
 ```
 
 !!! warning "LLM cost"
-    Cloud LLM pricing depends on model, prompt size, and CVE count. Vens does not estimate cost — run once against your provider and read the billing dashboard. For zero-cost or air-gapped runs, use Ollama.
+    Cloud LLM pricing depends on model, prompt size, and CVE count. Vens does not estimate cost.
+
+    For an exact number, run once against your provider and read the billing dashboard. For a pre-run estimate, run with `--debug-dir ./debug`, count the tokens in `debug/system.prompt`, and plug into your provider's pricing page (the `human.prompt` file is overwritten on every batch and output tokens are not captured, so this is approximate).
+
+    For zero-cost or air-gapped runs, use Ollama.
 
 ---
 
