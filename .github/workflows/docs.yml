@@ -45,9 +45,7 @@ jobs:
           cache-dependency-path: docs/requirements.txt
 
       - name: Install MkDocs Material
-        run: |
-          pip install --upgrade pip
-          pip install -r docs/requirements.txt
+        run: pip install --require-hashes --no-deps -r docs/requirements.txt
 
       - name: Build site (strict)
         run: mkdocs build --strict
