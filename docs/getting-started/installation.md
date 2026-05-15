@@ -128,6 +128,26 @@ Download the latest release for your OS/architecture from the [releases page](ht
 
 ---
 
+### Verify the download
+
+Release artifacts are signed with [cosign](https://github.com/sigstore/cosign) keyless signing (Sigstore, GitHub Actions OIDC — no long-lived keys). Each release publishes `SHA256SUMS`, its detached signature `SHA256SUMS.sig`, and the signing certificate `SHA256SUMS.pem`. Download all three alongside your archive from the [releases page](https://github.com/venslabs/vens/releases), then:
+
+```bash
+cosign verify-blob \
+  --certificate SHA256SUMS.pem \
+  --signature SHA256SUMS.sig \
+  --certificate-identity-regexp '^https://github.com/venslabs/vens/\.github/workflows/release\.yml@refs/tags/v' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  SHA256SUMS
+
+sha256sum --check --ignore-missing SHA256SUMS
+```
+
+!!! note
+    Releases also carry a GitHub build-provenance attestation. Verify it with `gh attestation verify <archive> --repo venslabs/vens`.
+
+---
+
 ### Configure an LLM provider
 
 Vens calls an LLM to score each CVE. All four providers below are first-class — pick whichever matches your constraints. Export credentials for **one**:
