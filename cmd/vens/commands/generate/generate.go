@@ -246,14 +246,21 @@ func action(cmd *cobra.Command, args []string) error {
 
 	var attestor *attestation.Builder
 	if attestEnabled {
+		var configHash string
+		if cfgB, rerr := os.ReadFile(configPath); rerr == nil {
+			configHash = attestation.HashInput(cfgB)
+		}
 		attestor = attestation.NewBuilder(attestation.Opts{
-			VensVersion: version.GetVersion(),
-			Provider:    provider,
-			Model:       model,
-			Seed:        o.Seed,
-			InputHash:   attestation.HashInput(inputB),
-			VEXUUID:     vexUUID,
-			VEXVersion:  sbomVersion,
+			VensVersion:         version.GetVersion(),
+			Provider:            provider,
+			Model:               model,
+			Seed:                o.Seed,
+			Temperature:         o.Temperature,
+			InputHash:           attestation.HashInput(inputB),
+			ConfigHash:          configHash,
+			PromptSchemaVersion: generator.PromptSchemaVersion,
+			VEXUUID:             vexUUID,
+			VEXVersion:          sbomVersion,
 		})
 		g.SetAttestor(attestor)
 	}
