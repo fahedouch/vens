@@ -110,7 +110,7 @@ func action(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load config.yaml with context hints
-	cfg, err := riskconfig.Load(configPath)
+	cfg, cfgBytes, err := riskconfig.Load(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to load config file %q: %w", configPath, err)
 	}
@@ -246,10 +246,6 @@ func action(cmd *cobra.Command, args []string) error {
 
 	var attestor *attestation.Builder
 	if attestEnabled {
-		var configHash string
-		if cfgB, rerr := os.ReadFile(configPath); rerr == nil {
-			configHash = attestation.HashInput(cfgB)
-		}
 		attestor = attestation.NewBuilder(attestation.Opts{
 			VensVersion:         version.GetVersion(),
 			Provider:            provider,
@@ -257,7 +253,7 @@ func action(cmd *cobra.Command, args []string) error {
 			Seed:                o.Seed,
 			Temperature:         o.Temperature,
 			InputHash:           attestation.HashInput(inputB),
-			ConfigHash:          configHash,
+			ConfigHash:          attestation.HashInput(cfgBytes),
 			PromptSchemaVersion: generator.PromptSchemaVersion,
 			VEXUUID:             vexUUID,
 			VEXVersion:          sbomVersion,

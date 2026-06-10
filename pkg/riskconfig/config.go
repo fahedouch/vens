@@ -140,23 +140,24 @@ var (
 	}
 )
 
-// Load parses a config.yaml file from the given path and validates entries.
-func Load(path string) (*Config, error) {
+// Load parses a config.yaml file from the given path, validates entries, and
+// returns the raw file bytes so callers can hash exactly what was read.
+func Load(path string) (*Config, []byte, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var cfg Config
 	if err := yaml.Unmarshal(b, &cfg); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Validate context hints
 	if err := cfg.validate(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &cfg, nil
+	return &cfg, b, nil
 }
 
 // validate checks that all context hints have valid values and applies defaults.
