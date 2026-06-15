@@ -1,0 +1,65 @@
+name: vens demo (Ollama)
+
+# Demo workflow for the SecureChainCon talk.
+# Run it manually, then download the artifact (VEX + signed CDXA attestation)
+# and use it in the talk: the demo slices the committed VEX with jq, no live LLM call.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # Build vens from source (main) so we get the CDXA attestation
+      - name: Build vens
+        run: go build -o "$RUNNER_TEMP/vens" ./cmd/vens
+
+      # Scan the demo image with Trivy -> JSON report
+      - name: Scan python:3.12-slim
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: python:3.12-slim
+          format: json
+          output: trivy.json
+          scanners: vuln
+
+      # Local LLM: small + fast model so the run stays short
+      - name: Start Ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama serve &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:11434/api/tags >/dev/null && break
+            sleep 2
+          done
+          ollama pull llama3.2:1b
+
+      # vens-action (from main) re-scores each CVE via Ollama, using the binary we built
+      - name: vens contextual triage
+        id: vens
+        uses: venslabs/vens-action@main
+        with:
+          bin-path: ${{ runner.temp }}/vens
+          input-report: trivy.json
+          config-file: examples/quickstart/config.yaml
+          llm-provider: ollama
+          llm-base-url: http://localhost:11434
+          llm-model: llama3.2:1b
+          # fail-on-severity: high   # uncomment to show the gate breaking the build on the OWASP score
+
+      # Publish the VEX + signed attestation for the talk
+      - name: Upload VEX + attestation
+        uses: actions/upload-artifact@v4
+        with:
+          name: vens-output
+          path: |
+            ${{ steps.vens.outputs.vex-file }}
+            *attestation*
+            *.cdx.json
