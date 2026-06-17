@@ -93,7 +93,7 @@ Output is a [CycloneDX VEX](https://cyclonedx.org/capabilities/vex/) document; e
 }
 ```
 
-The per-CVE reasoning from the LLM is logged to stderr as the command runs, and is captured alongside prompts/responses when you pass `--debug-dir <path>`. It is intentionally not embedded in the VEX file to keep the document strictly CycloneDX-compliant.
+The per-CVE reasoning from the LLM is logged to stderr as the command runs, and is captured alongside prompts/responses when you pass `--debug-dir <path>`. It is intentionally not embedded in the VEX file to keep the document strictly CycloneDX-compliant. For a durable, auditable record of how each CVE was scored, pass `--attest` to also write a CycloneDX attestation next to the VEX.
 
 ## Configuration
 
@@ -142,6 +142,7 @@ vens generate --config-file config.yaml INPUT OUTPUT
 - `--llm` - LLM provider: `openai` | `anthropic` | `ollama` | `googleai` (default: `auto`)
 - `--llm-batch-size` - CVEs per request (default: `10`)
 - `--debug-dir` - Save prompts/responses for debugging
+- `--attest` - Emit a CycloneDX attestation sidecar recording how each CVE was scored (model, seed, prompt/input/config hashes, reasoning, raw response) for audit and reproduction
 
 ### `vens enrich`
 
