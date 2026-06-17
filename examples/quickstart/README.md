@@ -30,6 +30,8 @@ vens generate \
 
 **Context**: See `config.yaml` for the risk profile (exposure, data sensitivity, compliance, security controls)
 
+**Audit trail**: add `--attest` to the command to also write `output_vex.attestation.cdx.json`, a [CycloneDX attestation](../../docs/reference/generate.md#--attest) recording how each CVE was scored (model, seed, prompt/input/config hashes, raw response) so a run can be audited and reproduced.
+
 ## How It Works
 
 ```
