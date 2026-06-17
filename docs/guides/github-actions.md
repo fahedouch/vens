@@ -12,7 +12,7 @@ Add this to your workflow after a container or dependency scan:
 
 - name: Prioritize with vens
   id: vens
-  uses: venslabs/vens-action@v0.1.0
+  uses: venslabs/vens-action@v0.2.0
   with:
     version: v0.3.2
     config-file: .vens/config.yaml
@@ -32,7 +32,7 @@ Add this to your workflow after a container or dependency scan:
       ${{ steps.vens.outputs.enriched-report }}
 ```
 
-For tighter supply-chain control, pin by commit SHA instead of the mutable tag: `uses: venslabs/vens-action@5e8b440b...  # v0.1.0`. Dependabot and Renovate both track SHA-pinned actions.
+For tighter supply-chain control, pin by commit SHA instead of the mutable tag: `uses: venslabs/vens-action@06d3eb97fb0c2040e95f3bea271d0aeb2fd00c76  # v0.2.0`. Dependabot and Renovate both track SHA-pinned actions.
 
 ## About vens-action
 
@@ -42,12 +42,34 @@ Key difference from running `vens generate` directly: the action handles binary 
 
 The `llm-api-key` is passed as an environment variable (never a CLI argument) and masked in workflow logs via `::add-mask::` before any step runs.
 
+## Attestation
+
+Set `attest: "true"` to also emit a [CycloneDX Attestations (CDXA)](https://cyclonedx.org/capabilities/attestations/) file next to the VEX, recording how each CVE was scored (model, seed, prompt/input/config hashes, raw LLM response) for audit and reproduction. Its path is exposed as the `attestation-file` output:
+
+```yaml
+- name: Prioritize with vens
+  id: vens
+  uses: venslabs/vens-action@v0.2.0
+  with:
+    # ...usual inputs...
+    attest: "true"
+
+- uses: actions/upload-artifact@v4
+  with:
+    name: vens-output
+    path: |
+      ${{ steps.vens.outputs.vex-file }}
+      ${{ steps.vens.outputs.attestation-file }}
+```
+
+The attestation is evidence (hashes plus the raw response), not a cryptographic signature, and it spells out the model's reasoning in clear text, so keep it access-controlled rather than in a public artifact. Requires vens-action v0.2.0 or later.
+
 ## Using the mock provider in CI
 
 For testing or cost savings, use the `mock` LLM provider — it returns fixed scores and costs nothing:
 
 ```yaml
-- uses: venslabs/vens-action@v0.1.0
+- uses: venslabs/vens-action@v0.2.0
   with:
     version: v0.3.2
     config-file: .vens/config.yaml
@@ -63,7 +85,7 @@ Good for gating builds on presence of a VEX file without calling external LLM se
 Pre-install the vens binary and pass `bin-path`:
 
 ```yaml
-- uses: venslabs/vens-action@v0.1.0
+- uses: venslabs/vens-action@v0.2.0
   with:
     bin-path: /opt/bin/vens
     config-file: .vens/config.yaml

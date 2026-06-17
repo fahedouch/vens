@@ -14,7 +14,7 @@ If you scan with Trivy or Grype in GitHub Actions, drop [`venslabs/vens-action`]
   run: trivy image python:3.11-slim --format json --output report.json
 
 - name: Prioritize with vens
-  uses: venslabs/vens-action@v0.1.0   # check the marketplace for the latest tag; pin by SHA in production
+  uses: venslabs/vens-action@v0.2.0   # check the marketplace for the latest tag; pin by SHA in production
   with:
     version: v0.3.2                   # vens binary version
     config-file: .vens/config.yaml    # see ../guides/configuration.md to author this file

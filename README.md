@@ -30,7 +30,7 @@ OWASP scoring (`Risk = Likelihood × Impact`, 0-81) reflects your system's expos
 
 **[GitHub Action](https://github.com/marketplace/actions/vens-action):**
 ```yaml
-- uses: venslabs/vens-action@v0.1.0   # check the marketplace for the latest tag; pin by SHA in production
+- uses: venslabs/vens-action@v0.2.0   # check the marketplace for the latest tag; pin by SHA in production
   with:
     version: v0.3.2                   # vens binary version
     config-file: .vens/config.yaml    # see docs/guides/configuration.md to author this file
