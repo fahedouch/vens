@@ -22,6 +22,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/venslabs/vens/internal/testutil"
+	"github.com/venslabs/vens/pkg/attestation"
 	"github.com/venslabs/vens/pkg/llm"
 	"github.com/venslabs/vens/pkg/outputhandler"
 	"github.com/venslabs/vens/pkg/riskconfig"
@@ -96,4 +98,41 @@ func TestGenerator_TruncationOnSingleCVEFails(t *testing.T) {
 	err = g.GenerateRiskScore(context.Background(), testVulns(2), nil)
 	require.Error(t, err)
 	require.True(t, errors.Is(err, llm.ErrTruncated))
+}
+
+func testVulns(n int) []Vulnerability {
+	v := make([]Vulnerability, n)
+	for i := range v {
+		v[i] = Vulnerability{VulnID: fmt.Sprintf("CVE-2024-%04d", i), PkgName: "pkg", Title: "t"}
+	}
+	return v
+}
+
+// One evidence batch is recorded per LLM call, so BatchCount tracks the batching.
+func TestGenerator_Attestor_OneBatchPerLLMCall(t *testing.T) {
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	g, err := New(Opts{LLM: testutil.NewMockLLM(), Config: &riskconfig.Config{}, BatchSize: 10})
+	require.NoError(t, err)
+	g.SetAttestor(at)
+
+	require.NoError(t, g.GenerateRiskScore(context.Background(), testVulns(15), nil))
+	require.Equal(t, 2, at.BatchCount()) // 15 vulns / batch size 10 -> 2 batches
+}
+
+type failingLLM struct{}
+
+func (failingLLM) Generate(context.Context, llm.Request) (string, error) {
+	return "", errors.New("llm down")
+}
+
+// A failed LLM call must not record evidence, or the attestation would carry
+// empty/garbage batches.
+func TestGenerator_Attestor_NoBatchOnLLMError(t *testing.T) {
+	at := attestation.NewBuilder(attestation.Opts{Provider: "mock", Model: "mock"})
+	g, err := New(Opts{LLM: failingLLM{}, Config: &riskconfig.Config{}})
+	require.NoError(t, err)
+	g.SetAttestor(at)
+
+	require.Error(t, g.GenerateRiskScore(context.Background(), testVulns(3), nil))
+	require.Equal(t, 0, at.BatchCount())
 }
