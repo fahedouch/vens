@@ -18,6 +18,7 @@ package generate
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -65,6 +66,7 @@ The LLM calculates the OWASP risk score (0-81) for each vulnerability using:
 	flags.String("config-file", "", "Path to config.yaml file with OWASP factors")
 	flags.String("input-format", "auto", "Input format ([auto trivy grype])")
 	flags.String("output-format", "auto", "Output format ([auto cyclonedxvex])")
+	flags.String("cyclonedx-spec-version", outputhandler.DefaultSpecVersion, fmt.Sprintf("CycloneDX spec version for VEX output (%s)", strings.Join(outputhandler.SupportedSpecVersions, " ")))
 	flags.String("debug-dir", "", "Directory to save debug files (prompts, responses)")
 	flags.String("sbom-serial-number", "", "SBOM serial number for BOM-Link (format: urn:uuid:...)")
 	flags.Int("sbom-version", 1, "SBOM version for BOM-Link (default: 1)")
@@ -199,14 +201,9 @@ func action(cmd *cobra.Command, args []string) error {
 		slog.DebugContext(ctx, "Using explicit input format", "format", inputFormat)
 	}
 
-	// Setup output handler
-	var h outputhandler.OutputHandler
-	outputW, err := os.Create(outputPath)
-	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
-	}
-	defer outputW.Close() //nolint:errcheck
-
+	// Resolve and validate every output-related flag BEFORE creating the
+	// output file: os.Create truncates an existing file, so it must run only
+	// once every value that can fail validation has been checked.
 	outputFormat, err := flags.GetString("output-format")
 	if err != nil {
 		return err
@@ -222,12 +219,24 @@ func action(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to extract SBOM metadata: %w", err)
 	}
 
+	specVersionStr, err := flags.GetString("cyclonedx-spec-version")
+	if err != nil {
+		return err
+	}
+	specVersion, err := outputhandler.ParseSpecVersion(specVersionStr)
+	if err != nil {
+		return err
+	}
+
 	// The VEX gets its own serialNumber; the attestation links back to it.
 	vexUUID := uuid.NewString()
 
+	var newHandler func(w io.Writer) outputhandler.OutputHandler
 	switch outputFormat {
 	case "cyclonedxvex":
-		h = outputhandler.NewCycloneDxVexOutputHandler(outputW, sbomUUID, sbomVersion, vexUUID)
+		newHandler = func(w io.Writer) outputhandler.OutputHandler {
+			return outputhandler.NewCycloneDxVexOutputHandler(w, sbomUUID, sbomVersion, vexUUID, specVersion)
+		}
 	default:
 		return fmt.Errorf("unknown output format %q", outputFormat)
 	}
@@ -237,6 +246,16 @@ func action(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse vulnerabilities: %w", err)
 	}
+
+	// Flags are validated and the report has parsed; only now is it safe to
+	// create (and truncate) the output file.
+	outputW, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer outputW.Close() //nolint:errcheck
+
+	h := newHandler(outputW)
 
 	if len(vulns) == 0 {
 		slog.WarnContext(ctx, "No vulnerabilities found in the report")
@@ -260,6 +279,7 @@ func action(cmd *cobra.Command, args []string) error {
 			ConfigHash:  attestation.HashInput(cfgBytes),
 			VEXUUID:     vexUUID,
 			VEXVersion:  sbomVersion,
+			SpecVersion: specVersion,
 		})
 		g.SetAttestor(attestor)
 	}

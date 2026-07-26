@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/CycloneDX/cyclonedx-go"
@@ -25,15 +26,63 @@ import (
 	"github.com/venslabs/vens/cmd/vens/version"
 )
 
+// DefaultSpecVersion is the CycloneDX spec version emitted when the caller does
+// not request a specific one. It is 1.6 because no released Dependency-Track
+// can ingest 1.7 yet; 1.7 stays available via --cyclonedx-spec-version.
+const DefaultSpecVersion = "1.6"
+
+// specVersionEntry pairs a CycloneDX spec version string with its
+// cyclonedx.SpecVersion. specVersions is the single ordered source of truth;
+// SupportedSpecVersions and specVersionsByString are both derived from it.
+type specVersionEntry struct {
+	name string
+	spec cyclonedx.SpecVersion
+}
+
+var specVersions = []specVersionEntry{
+	{"1.6", cyclonedx.SpecVersion1_6},
+	{"1.7", cyclonedx.SpecVersion1_7},
+}
+
+// SupportedSpecVersions lists the CycloneDX spec versions vens can emit, in
+// ascending order. Used for validation and help/error text.
+var SupportedSpecVersions = func() []string {
+	names := make([]string, len(specVersions))
+	for i, e := range specVersions {
+		names[i] = e.name
+	}
+	return names
+}()
+
+var specVersionsByString = func() map[string]cyclonedx.SpecVersion {
+	m := make(map[string]cyclonedx.SpecVersion, len(specVersions))
+	for _, e := range specVersions {
+		m[e.name] = e.spec
+	}
+	return m
+}()
+
+// ParseSpecVersion maps a CycloneDX spec version string (e.g. "1.6", "1.7") to
+// its cyclonedx.SpecVersion. It returns an error for any value outside
+// SupportedSpecVersions.
+func ParseSpecVersion(s string) (cyclonedx.SpecVersion, error) {
+	if v, ok := specVersionsByString[s]; ok {
+		return v, nil
+	}
+	return 0, fmt.Errorf("unsupported CycloneDX spec version %q (supported: %s)", s, strings.Join(SupportedSpecVersions, ", "))
+}
+
 // NewCycloneDxVexOutputHandler returns an OutputHandler that accumulates
 // vulnerability ratings and emits a proper CycloneDX VEX BOM on Close.
 // vexUUID is the VEX document's serialNumber UUID; pass "" to generate one.
-func NewCycloneDxVexOutputHandler(w io.Writer, sbomUUID string, sbomVersion int, vexUUID string) OutputHandler {
+// specVersion selects the CycloneDX spec version the BOM is encoded to.
+func NewCycloneDxVexOutputHandler(w io.Writer, sbomUUID string, sbomVersion int, vexUUID string, specVersion cyclonedx.SpecVersion) OutputHandler {
 	return &cycloneDxVexWriter{
 		w:           w,
 		sbomUUID:    sbomUUID,
 		sbomVersion: sbomVersion,
 		vexUUID:     vexUUID,
+		specVersion: specVersion,
 	}
 }
 
@@ -43,6 +92,7 @@ type cycloneDxVexWriter struct {
 	sbomUUID    string
 	sbomVersion int
 	vexUUID     string
+	specVersion cyclonedx.SpecVersion
 	closed      bool
 }
 
@@ -116,7 +166,7 @@ func (c *cycloneDxVexWriter) Close() error {
 
 	enc := cyclonedx.NewBOMEncoder(c.w, cyclonedx.BOMFileFormatJSON)
 	enc.SetPretty(true)
-	if err := enc.EncodeVersion(bom, cyclonedx.SpecVersion1_7); err != nil {
+	if err := enc.EncodeVersion(bom, c.specVersion); err != nil {
 		return err
 	}
 	c.closed = true

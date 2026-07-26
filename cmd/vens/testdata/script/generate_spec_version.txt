@@ -1,0 +1,81 @@
+# Test the --cyclonedx-spec-version flag
+
+# Default (no flag) emits CycloneDX 1.6
+exec vens generate --llm=mock --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json default.cdx.json
+json-contains default.cdx.json '"specVersion": "1.6"'
+
+# Explicit 1.7
+exec vens generate --llm=mock --cyclonedx-spec-version=1.7 --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json v17.cdx.json
+json-contains v17.cdx.json '"specVersion": "1.7"'
+
+# The attestation sidecar matches the requested spec version
+exec vens generate --llm=mock --attest --cyclonedx-spec-version=1.7 --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json v17att.cdx.json
+json-contains v17att.cdx.json '"specVersion": "1.7"'
+json-contains v17att.attestation.cdx.json '"specVersion": "1.7"'
+
+# Opt out to 1.6
+exec vens generate --llm=mock --cyclonedx-spec-version=1.6 --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json v16.cdx.json
+json-contains v16.cdx.json '"specVersion": "1.6"'
+
+# Unsupported version is rejected with a clear error, and an existing output
+# file is NOT truncated by the failed run
+cp v16.cdx.json existing.cdx.json
+! exec vens generate --llm=mock --cyclonedx-spec-version=1.5 --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json bad.cdx.json
+stderr 'unsupported CycloneDX spec version'
+! exec vens generate --llm=mock --cyclonedx-spec-version=1.5 --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 report.json existing.cdx.json
+cmp v16.cdx.json existing.cdx.json
+
+# A malformed report that still detects as Trivy (it has a "Results" key) fails
+# the typed unmarshal. It must not truncate an existing output file either: the
+# report is parsed before the output file is created.
+cp v16.cdx.json existing2.cdx.json
+! exec vens generate --llm=mock --config-file=config.yaml --sbom-serial-number=urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79 malformed.json existing2.cdx.json
+stderr 'failed to parse vulnerabilities'
+cmp v16.cdx.json existing2.cdx.json
+
+-- config.yaml --
+project:
+  name: "test-project"
+  description: "Test project for integration tests"
+context:
+  exposure: "internet"
+  data_sensitivity: "high"
+  business_criticality: "critical"
+-- report.json --
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2024-01-15T10:00:00Z",
+  "ArtifactName": "nginx:1.25",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "nginx:1.25 (debian 12.4)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2024-1234",
+          "PkgID": "openssl@3.0.11-1~deb12u2",
+          "PkgName": "openssl",
+          "PkgIdentifier": {
+            "PURL": "pkg:deb/debian/openssl@3.0.11-1~deb12u2?arch=amd64&distro=debian-12.4"
+          },
+          "InstalledVersion": "3.0.11-1~deb12u2",
+          "FixedVersion": "3.0.13-1~deb12u1",
+          "Status": "fixed",
+          "Title": "OpenSSL: Buffer overflow in SSL_select_next_proto",
+          "Description": "A buffer overflow vulnerability in OpenSSL.",
+          "Severity": "HIGH",
+          "DataSource": {
+            "ID": "debian",
+            "Name": "Debian Security Tracker",
+            "URL": "https://security-tracker.debian.org/tracker/CVE-2024-1234"
+          }
+        }
+      ]
+    }
+  ]
+}
+
+-- malformed.json --
+{"Results": "not-an-array"}
