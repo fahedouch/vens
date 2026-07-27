@@ -7,6 +7,8 @@ slug: vens-action-rerank-cves-in-ci
 
 # vens-action: reranking Trivy/Grype CVEs by real risk in CI
 
+![Rerank your CVEs in CI](../../assets/rerank-ci-cover.svg)
+
 If you run Trivy or Grype in CI and triage the output by CVSS, this is the thing I wish I'd had two years ago.
 
 <!-- more -->
