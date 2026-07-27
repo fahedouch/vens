@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Stop patching CVEs that don't matter. Score every finding against your system, not the CVSS number." font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b2a33"/>
+      <stop offset="1" stop-color="#0f3b49"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- a scan's worth of findings; most don't matter, one does -->
+  <g>
+    <rect x="815" y="150" width="305" height="34" rx="6" fill="#3f8ba3" opacity="0.13"/>
+    <rect x="815" y="196" width="250" height="34" rx="6" fill="#3f8ba3" opacity="0.13"/>
+    <rect x="815" y="242" width="210" height="34" rx="6" fill="#3f8ba3" opacity="0.13"/>
+    <rect x="815" y="288" width="305" height="34" rx="6" fill="#7fc4d6"/>
+    <rect x="815" y="334" width="180" height="34" rx="6" fill="#3f8ba3" opacity="0.13"/>
+    <rect x="815" y="380" width="240" height="34" rx="6" fill="#3f8ba3" opacity="0.13"/>
+    <rect x="815" y="426" width="140" height="34" rx="6" fill="#3f8ba3" opacity="0.13"/>
+  </g>
+
+  <text x="90" y="146" fill="#7fc4d6" font-size="25" font-weight="600" letter-spacing="4">VENS · INTRODUCTION</text>
+  <rect x="90" y="164" width="62" height="4" fill="#7fc4d6"/>
+
+  <text x="86" y="300" fill="#ffffff" font-size="74" font-weight="800" letter-spacing="-1">Stop patching</text>
+  <text x="86" y="384" fill="#ffffff" font-size="74" font-weight="800" letter-spacing="-1">CVEs that don't</text>
+  <text x="86" y="468" fill="#ffffff" font-size="74" font-weight="800" letter-spacing="-1">matter</text>
+
+  <text x="90" y="540" fill="#cfe1e7" font-size="32">Score every finding against your system,</text>
+  <text x="90" y="582" fill="#cfe1e7" font-size="32">not the CVSS number.</text>
+</svg>
