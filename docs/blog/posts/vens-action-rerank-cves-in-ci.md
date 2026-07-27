@@ -11,7 +11,7 @@ If you run Trivy or Grype in CI and triage the output by CVSS, this is the thing
 
 <!-- more -->
 
-## Quick recap
+## What it does
 
 Trivy and Grype hand you a list of CVEs. CVSS is a score in a vacuum: it doesn't know whether a service runs in a private subnet behind mTLS, or sits on the open internet handling payment cards. [vens](https://github.com/venslabs/vens) reads your scan output plus a YAML describing the service (exposure, data sensitivity, business criticality, controls, compliance, ...), runs every CVE through an LLM with that context, and emits a CycloneDX VEX with OWASP Risk Rating scores. You gate the build on those instead.
 
@@ -20,7 +20,7 @@ Trivy and Grype hand you a list of CVEs. CVSS is a score in a vacuum: it doesn't
 ## What you need
 
 - A Trivy or Grype JSON report (you're probably running one of these already).
-- A `.vens/config.yaml`. Three context fields are the floor; the full annotated reference is in [`examples/quickstart/config.yaml`](https://github.com/venslabs/vens/blob/main/examples/quickstart/config.yaml).
+- A `.vens/config.yaml`. Three context fields are the floor (see below).
 - An LLM API key: OpenAI, Anthropic, Google, or a self-hosted Ollama.
 - The `serialNumber` of your CycloneDX SBOM (or an ad-hoc one, see below).
 
@@ -73,18 +73,22 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Trivy scan
-        run: trivy image python:3.11-slim --format json --output report.json
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: python:3.11-slim
+          format: json
+          output: report.json
 
       - name: vens
         id: vens
-        uses: venslabs/vens-action@v0.1.0
+        uses: venslabs/vens-action@v0.2.0
         with:
-          version: v0.3.2
+          version: v0.4.0
           config-file: .vens/config.yaml
           input-report: report.json
           sbom-serial-number: ${{ vars.SBOM_SERIAL }}
           llm-provider: openai
-          llm-model: gpt-4o
+          llm-model: gpt-5.4-mini
           llm-api-key: ${{ secrets.OPENAI_API_KEY }}
           fail-on-severity: critical
           enrich: "true"
@@ -97,7 +101,7 @@ jobs:
             ${{ steps.vens.outputs.enriched-report }}
 ```
 
-Each run gives you a CycloneDX VEX (`vex-file`), your original Trivy report annotated with `Custom.owasp_score` (`enriched-report`, when `enrich: true`), and per-severity counts as step outputs (`count-critical`, `count-high`, ...). Pipe the counts into dashboards, PR comments, whatever you already do with scan metrics.
+Each run gives you a CycloneDX VEX (`vex-file`), your original Trivy report annotated with `Custom.owasp_score` and `Custom.owasp_vector` (`enriched-report`, when `enrich: true`), and per-severity counts as step outputs (`count-critical`, `count-high`, ...). Pipe the counts into dashboards, PR comments, whatever you already do with scan metrics.
 
 `fail-on-severity: critical` makes the step fail if any CVE comes out CRITICAL by OWASP (score >= 60). Drop the line if you just want artifacts and a manual review.
 

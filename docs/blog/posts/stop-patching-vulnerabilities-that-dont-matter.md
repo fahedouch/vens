@@ -15,9 +15,9 @@ Except that CVE targets a feature you don't even use. Two days gone for nothing.
 
 CVSS tells you the technical severity of the bug. Not the real risk for *your* system.
 
-## Context, finally
+## What vens does
 
-[vens](https://github.com/venslabs/vens) reads your scan output plus a short file describing your system (exposure, sensitive data, compliance, security controls) and computes a realistic OWASP Risk Rating with an LLM. The result tells you what to patch first.
+[vens](https://github.com/venslabs/vens) reads your scan output plus a short file describing your system (exposure, sensitive data, compliance, security controls) and computes an OWASP Risk Rating with an LLM. The result tells you what to patch first.
 
 ## How it works
 
@@ -45,24 +45,27 @@ project:
   description: "Customer-facing REST API"
 
 context:
-  exposure: "internet"                    # internet-accessible
+  exposure: "internet"                    # internal | private | internet
   data_sensitivity: "high"                # customer PII
   business_criticality: "high"            # business-critical service
   compliance_requirements: ["GDPR", "SOC2"]
   controls:
-    waf: true                             # WAF in front
-    ids: true                             # IDS in place
+    waf: true
+    ids: true
 ```
 
 ### 4. Run the contextual analysis
 
 ```bash
 export OPENAI_API_KEY="sk-..."
-export OPENAI_MODEL="gpt-4o"
-trivy vens generate --config-file config.yaml report.json output.vex.json
+export OPENAI_MODEL="gpt-5.4-mini"
+
+# serialNumber of the SBOM paired with this scan; any urn:uuid: works for a first run
+SBOM_UUID="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
+trivy vens generate --config-file config.yaml --sbom-serial-number "$SBOM_UUID" report.json output.vex.json
 ```
 
-## A VEX that speaks your language
+## The output
 
 Here is an extract of what vens generates:
 
@@ -100,15 +103,6 @@ Here is an extract of what vens generates:
 ```
 
 Same two CVEs, ranked by what they mean for your deployment rather than by a context-free base score.
-
-## The flow
-
-```
-Trivy scan       ->  107 CVEs with CVSS scores
-vens + LLM       ->  scores each CVE with YOUR context
-OWASP scores     ->  Risk = Likelihood x Impact
-prioritized list ->  fix what matters for you
-```
 
 ## Try it
 
