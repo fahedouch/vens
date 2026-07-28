@@ -7,6 +7,8 @@ slug: stop-patching-vulnerabilities-that-dont-matter
 
 # Stop patching vulnerabilities that don't matter to you
 
+![Stop patching CVEs that don't matter](../../assets/stop-patching-cover.svg)
+
 Monday, 9 AM, coffee in hand. You open the Trivy report: **107 vulnerabilities**. You sort by CVSS, a **9.8 CRITICAL** sits at the top, and the emergency meeting starts.
 
 <!-- more -->
