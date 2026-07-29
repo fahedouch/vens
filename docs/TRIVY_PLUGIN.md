@@ -31,11 +31,9 @@ trivy vens generate --config-file config.yaml report.json output.vex.json
     "ratings": [{
       "method": "OWASP",
       "score": 10.0,
-      "severity": "low"
-    }],
-    "analysis": {
-      "detail": "Low risk: Not applicable to runtime environment"
-    }
+      "severity": "low",
+      "vector": "SL:3/M:3/O:3/S:3/ED:2/EE:2/A:2/ID:7/LC:4/LI:4/LAV:4/LAC:4/FD:4/RD:4/NC:4/PV:4"
+    }]
   }]
 }
 ```
