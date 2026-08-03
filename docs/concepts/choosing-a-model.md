@@ -7,6 +7,8 @@ Vens makes one LLM call per CVE batch, so the model is a direct cost and quality
 
 [**Which LLM Should Score Your CVEs?** (PDF)](../assets/vens-benchmark.pdf)
 
+Cite it: [`10.5281/zenodo.21775841`](https://doi.org/10.5281/zenodo.21775841).
+
 ---
 
 ## Recommendation
