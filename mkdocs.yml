@@ -88,6 +88,7 @@ nav:
       - Vens vs alternatives: concepts/alternatives.md
       - Choosing an LLM: concepts/choosing-a-model.md
       - Limitations: concepts/limitations.md
+  - Talks: talks.md
   - Blog: blog/index.md
   - Reference:
       - config.yaml schema: reference/config-schema.md
