@@ -23,7 +23,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
@@ -361,18 +360,6 @@ func tempOutputFile(outputPath string) (*os.File, error) {
 		return nil, err
 	}
 	return tmp, nil
-}
-
-// outputFileMode reports the permissions the output file should have: the
-// destination's existing mode when it already exists, otherwise the
-// 0666-before-umask mode os.Create would have produced.
-func outputFileMode(outputPath string) os.FileMode {
-	if fi, err := os.Stat(outputPath); err == nil {
-		return fi.Mode().Perm()
-	}
-	umask := syscall.Umask(0)
-	syscall.Umask(umask)
-	return 0o666 &^ os.FileMode(umask)
 }
 
 // extractSBOMMetadata extracts UUID and version from flags.

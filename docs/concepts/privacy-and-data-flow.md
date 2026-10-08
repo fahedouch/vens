@@ -86,7 +86,10 @@ If any of those answers are unacceptable for your data, **use Ollama** — the e
 
 ## Local / air-gapped deployment
 
-When you configure `OLLAMA_MODEL` and run Vens with `--llm ollama` (or let auto-detection pick Ollama), **no data leaves the machine running Ollama**. Vens makes HTTP requests to `http://localhost:11434` by default, or to `$OLLAMA_HOST` if you run Ollama on a different host inside your network.
+!!! warning "Ollama is never selected for you"
+    `--llm` defaults to `auto`, and `auto` resolves to OpenAI. No environment variable changes that. Setting `OLLAMA_MODEL` and forgetting `--llm ollama` sends every prompt, including `notes` verbatim, to `api.openai.com` when `OPENAI_API_KEY` is still exported. With no key the run fails instead. On a machine that must stay local, pass `--llm ollama` and unset `OPENAI_API_KEY`.
+
+When you configure `OLLAMA_MODEL` and run Vens with `--llm ollama`, **no data leaves the machine running Ollama**. Vens makes HTTP requests to `http://localhost:11434` by default, or to `$OLLAMA_HOST` if you run Ollama on a different host inside your network.
 
 For air-gapped networks: install Vens and Ollama on any box that can reach each other; no outbound internet connectivity is required after the initial model pull.
 
@@ -104,13 +107,13 @@ These files contain exactly the same data the LLM receives. They are useful for 
 - your full architectural context (`notes` field),
 - every CVE identifier from the scanned image.
 
-Store it accordingly. See [`--debug-dir`](../reference/generate.md#--debug-dir-path) for retention guidance.
+Store it accordingly. See [`--debug-dir`](../reference/generate.md#-debug-dir-path) for retention guidance.
 
 ## Attestation file
 
 When you pass `--attest`, Vens writes a CycloneDX attestation next to the VEX (`<output>.attestation.cdx.json`). Per scored CVE it records the model and seed, SHA-256 hashes of the prompt, scanner report and `config.yaml`, and the **raw LLM response** (base64, not encrypted).
 
-The hashes are opaque, but the claims state the CVEs you scored and the model's reasoning in clear text, and the raw response can echo SBOM-derived context. So it carries the same sensitivity as the debug output: treat it as security evidence, keep it access-controlled, and out of public build artifacts. See [`--attest`](../reference/generate.md#--attest).
+The hashes are opaque, but the claims state the CVEs you scored and the model's reasoning in clear text, and the raw response can echo SBOM-derived context. So it carries the same sensitivity as the debug output: treat it as security evidence, keep it access-controlled, and out of public build artifacts. See [`--attest`](../reference/generate.md#-attest).
 
 ---
 

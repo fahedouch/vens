@@ -61,7 +61,7 @@ vens --version
     Make sure `$(go env GOPATH)/bin` is in your `$PATH`.
 
 !!! note
-    Pinning a specific version: `go install github.com/venslabs/vens/cmd/vens@v0.3.0`.
+    Pinning a specific version: `go install github.com/venslabs/vens/cmd/vens@v0.5.0`.
 
 ---
 
@@ -87,11 +87,20 @@ From now on, anywhere in this documentation where you see `vens <command>`, you 
 
 Download the latest release for your OS/architecture from the [releases page](https://github.com/venslabs/vens/releases), extract it, and put it in your `$PATH`.
 
-=== "Linux (x86_64)"
+=== "Linux (amd64)"
 
     ```bash
-    # Replace VERSION with the actual tag, e.g. v0.3.0
-    curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens_Linux_x86_64.tar.gz \
+    # Replace VERSION with the release tag, e.g. v0.5.0
+    curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens-VERSION-linux-amd64.tar.gz \
+      | tar -xz
+    sudo mv vens /usr/local/bin/
+    vens --version
+    ```
+
+=== "Linux (arm64)"
+
+    ```bash
+    curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens-VERSION-linux-arm64.tar.gz \
       | tar -xz
     sudo mv vens /usr/local/bin/
     vens --version
@@ -100,7 +109,7 @@ Download the latest release for your OS/architecture from the [releases page](ht
 === "macOS (Apple Silicon)"
 
     ```bash
-    curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens_Darwin_arm64.tar.gz \
+    curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens-VERSION-darwin-arm64.tar.gz \
       | tar -xz
     sudo mv vens /usr/local/bin/
     vens --version
@@ -109,22 +118,36 @@ Download the latest release for your OS/architecture from the [releases page](ht
 === "macOS (Intel)"
 
     ```bash
-    curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens_Darwin_x86_64.tar.gz \
+    curl -L https://github.com/venslabs/vens/releases/download/VERSION/vens-VERSION-darwin-amd64.tar.gz \
       | tar -xz
     sudo mv vens /usr/local/bin/
     vens --version
     ```
 
-=== "Windows"
-
-    Download `vens_Windows_x86_64.zip` from the releases page, extract it, and add the folder containing `vens.exe` to your `PATH`. Then in PowerShell:
+=== "Windows (amd64)"
 
     ```powershell
+    curl.exe -L -o vens.tar.gz https://github.com/venslabs/vens/releases/download/VERSION/vens-VERSION-windows-amd64.tar.gz
+    tar.exe -xzf vens.tar.gz
+    New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Programs\vens" | Out-Null
+    Move-Item -Force vens.exe "$env:LOCALAPPDATA\Programs\vens\"
+    $env:Path = "$env:LOCALAPPDATA\Programs\vens;$env:Path"
+    vens --version
+    ```
+
+=== "Windows (arm64)"
+
+    ```powershell
+    curl.exe -L -o vens.tar.gz https://github.com/venslabs/vens/releases/download/VERSION/vens-VERSION-windows-arm64.tar.gz
+    tar.exe -xzf vens.tar.gz
+    New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Programs\vens" | Out-Null
+    Move-Item -Force vens.exe "$env:LOCALAPPDATA\Programs\vens\"
+    $env:Path = "$env:LOCALAPPDATA\Programs\vens;$env:Path"
     vens --version
     ```
 
 !!! note
-    Exact archive names follow the release assets. Check the [releases page](https://github.com/venslabs/vens/releases) for the file matching your platform if unsure.
+    Assets are named `vens-<tag>-<os>-<arch>.tar.gz`, built for linux, darwin and windows on amd64 and arm64. The Windows archives hold `vens.exe` and ship from v0.5.1 onwards; for an earlier tag, install from source with `go install github.com/venslabs/vens/cmd/vens@latest`. The `$env:Path` assignment in the Windows tabs lasts for the current PowerShell session only — add the folder to your user PATH to keep it. See the [releases page](https://github.com/venslabs/vens/releases) for the current tag.
 
 ---
 
@@ -177,7 +200,7 @@ Vens asks the LLM to return structured JSON with four 0–9 component scores per
     export OPENAI_MODEL="gpt-5.4-mini"
     ```
 
-    Among the cloud providers, OpenAI and Google AI accept the `seed` parameter Vens forwards (`--llm-seed`); Anthropic has no seed parameter and silently ignores it. This does not guarantee byte-identical scores across runs — see [Reference: `--llm-seed`](../reference/generate.md#--llm-seed-int) and [Limitations](../concepts/limitations.md).
+    Among the cloud providers, OpenAI and Google AI accept the `seed` parameter Vens forwards (`--llm-seed`); Anthropic has no seed parameter and silently ignores it. This does not guarantee byte-identical scores across runs — see [Reference: `--llm-seed`](../reference/generate.md#-llm-seed-int) and [Limitations](../concepts/limitations.md).
 
 === "Anthropic"
 
@@ -193,10 +216,10 @@ Vens asks the LLM to return structured JSON with four 0–9 component scores per
     export GOOGLE_MODEL="gemini-2.5-flash"
     ```
 
-Auto-detection currently defaults to **OpenAI**. If you use a different provider, pass the `--llm` flag explicitly:
+`--llm` defaults to `auto`, and `auto` simply means **OpenAI**: it never looks at your environment to pick a provider. For anything else, pass the flag explicitly:
 
 ```bash
---llm openai      # default when auto
+--llm openai      # what auto resolves to
 --llm anthropic
 --llm googleai
 --llm ollama

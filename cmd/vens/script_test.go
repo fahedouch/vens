@@ -47,7 +47,11 @@ func TestMain(m *testing.M) {
 			panic(err)
 		}
 
-		vensBinary = filepath.Join(testBinDir, "vens")
+		vensBinaryName := "vens"
+		if runtime.GOOS == "windows" {
+			vensBinaryName = "vens.exe"
+		}
+		vensBinary = filepath.Join(testBinDir, vensBinaryName)
 		srcDir := sourceDir()
 
 		cmd := exec.Command("go", "build", "-o", vensBinary, ".")

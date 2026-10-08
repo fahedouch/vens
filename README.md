@@ -5,21 +5,22 @@
 [![GitHub Downloads][github-downloads-img]][release]
 [![Documentation][docs-img]][docs]
 
-# vens — Prioritize vulnerabilities by real risk, not just CVSS
+# vens — Prioritize vulnerabilities by real risk, not just the generic CVSS score
 
 **Your scanner found 300 CVEs. Which ones actually matter?** Vens takes a Trivy or Grype report, combines it with a description of _your_ system (exposure, data sensitivity, compliance, security controls), and scores every CVE based on its real risk to you — not just its generic severity.
 
 The output is a [CycloneDX VEX](https://www.ntia.gov/files/ntia/publications/vex_one-page_summary.pdf) file with [OWASP Risk Rating](https://owasp.org/www-community/OWASP_Risk_Rating_Methodology) scores.
+Your CI gate fails the build on it, and [Dependency-Track 5.1+](https://venslabs.github.io/vens/guides/dependency-track/) puts it on every matching finding.
 
 <p align="center">
-  <img src="docs/assets/vens-logic.png" alt="vens — scanner report + SBOM + system context, scored by an LLM into a CycloneDX VEX with OWASP ratings" width="720">
+  <img src="docs/assets/vens-logic.png" alt="vens takes a scanner report and your system context, scores every CVE with an LLM, and emits a CycloneDX VEX plus a CDXA attestation that a CI gate and Dependency-Track consume" width="820">
 </p>
 
 ## Why vens?
 
 OWASP scoring (`Risk = Likelihood × Impact`, 0-81) reflects your system's exposure, data sensitivity, and controls — not just generic CVE severity:
 
-| Scenario | CVSS (Generic) | OWASP (Contextual) | Why? |
+| Scenario | CVSS base | OWASP (Contextual) | Why? |
 |-----|----------------|-------------------|------|
 | Generic RCE in a library whose vulnerable path is not executed | 8.8 HIGH | **10.0 LOW** ⬇️ | Not reachable in your runtime |
 | Info leak in a PII handler running under GDPR | 5.3 MEDIUM | **52.0 HIGH** ⬆️ | PII leak + compliance impact |
@@ -72,8 +73,8 @@ SBOM_SERIAL="urn:uuid:$(uuidgen | tr '[:upper:]' '[:lower:]')"
 # 4. Generate contextual risk scores
 vens generate --config-file config.yaml --sbom-serial-number "$SBOM_SERIAL" report.json output.vex.json
 
-# 5. Optionally fold the OWASP ratings back into the Trivy report
-vens enrich --vex output.vex.json report.json
+# 5. Optionally fold the OWASP ratings into a copy of the Trivy report
+vens enrich --vex output.vex.json --output enriched-report.json report.json
 ```
 
 Output is a [CycloneDX VEX](https://cyclonedx.org/capabilities/vex/) document; each vulnerability carries an OWASP rating:
@@ -129,7 +130,7 @@ context:
 Generate VEX with contextual OWASP scores:
 
 ```bash
-vens generate --config-file config.yaml INPUT OUTPUT
+vens generate --config-file config.yaml --sbom-serial-number urn:uuid:<uuid> INPUT OUTPUT
 ```
 
 **Supported scanners:**
@@ -138,6 +139,7 @@ vens generate --config-file config.yaml INPUT OUTPUT
 
 **Key flags:**
 - `--config-file` (required) - Path to config.yaml
+- `--sbom-serial-number` (required) - serialNumber of the CycloneDX SBOM paired with this scan, in `urn:uuid:<uuid>` form (`jq -r .serialNumber sbom.cdx.json`)
 - `--input-format` - Scanner format: `auto` | `trivy` | `grype` (default: `auto`)
 - `--llm` - LLM provider: `openai` | `anthropic` | `ollama` | `googleai` (default: `auto`)
 - `--llm-batch-size` - CVEs per request (default: `10`)
@@ -147,11 +149,15 @@ vens generate --config-file config.yaml INPUT OUTPUT
 
 ### `vens enrich`
 
-Apply VEX scores to your Trivy report:
+Copy the OWASP scores from a VEX into a Trivy report:
 
 ```bash
-vens enrich --vex output.vex.json report.json
+vens enrich --vex output.vex.json --output enriched-report.json report.json
 ```
+
+**Key flags:**
+- `--vex` (required) - Path to the VEX file written by `vens generate`
+- `--output` - Where to write the enriched report (default: stdout)
 
 ---
 

@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
@@ -43,4 +43,35 @@ jobs:
           version: ${{ steps.golangci.outputs.version }}
           args: --timeout=10m --verbose
 
+      - name: golangci-lint (windows)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        with:
+          version: ${{ steps.golangci.outputs.version }}
+          args: --timeout=10m --verbose
+
       - run: go install ./cmd/vens
+
+  windows:
+    permissions:
+      contents: read
+    runs-on: windows-latest
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 'stable'
+
+      - name: Unit tests
+        run: go test -covermode=atomic -race -v ./pkg/...
+
+      - name: Integration tests
+        run: go test -v ./cmd/vens/... -run TestScript

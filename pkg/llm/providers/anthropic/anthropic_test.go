@@ -24,6 +24,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/anthropics/anthropic-sdk-go/option"
+
 	"github.com/venslabs/vens/pkg/llm"
 )
 
@@ -203,5 +205,90 @@ func TestGenerate_InvalidSchema_NoNetwork(t *testing.T) {
 	}
 	if rec.hits != 0 {
 		t.Errorf("handler should not be hit, got %d", rec.hits)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func capturingClient(got *string) option.RequestOption {
+	return option.WithHTTPClient(&http.Client{
+		Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			*got = r.URL.String()
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(successBody)),
+				Request:    r,
+			}, nil
+		}),
+	})
+}
+
+// Asserting what resolveBaseURL returns would keep passing with the bug back in
+// place, so assert the URL the SDK actually calls.
+func TestNewTargetsAnthropicWhenBaseURLIsEmpty(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "test-key")
+	t.Setenv("ANTHROPIC_BASE_URL", "")
+
+	var got string
+	c, err := newClient("claude-sonnet-4-5", option.WithMaxRetries(0), capturingClient(&got))
+	if err != nil {
+		t.Fatalf("newClient: %v", err)
+	}
+	if _, err := c.Generate(context.Background(), newReq()); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	if want := defaultBaseURL + "v1/messages"; got != want {
+		t.Errorf("request URL = %q, want %q", got, want)
+	}
+}
+
+func TestNewKeepsAConfiguredBaseURL(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "test-key")
+	t.Setenv("ANTHROPIC_BASE_URL", "http://localhost:8080/")
+
+	var got string
+	c, err := newClient("claude-sonnet-4-5", option.WithMaxRetries(0), capturingClient(&got))
+	if err != nil {
+		t.Fatalf("newClient: %v", err)
+	}
+	if _, err := c.Generate(context.Background(), newReq()); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	if want := "http://localhost:8080/v1/messages"; got != want {
+		t.Errorf("request URL = %q, want %q", got, want)
+	}
+}
+
+func TestGenerate_UnsupportedStructuredOutput(t *testing.T) {
+	const body = `{"type":"error","error":{"type":"invalid_request_error",` +
+		`"message":"output_config.format: Structured outputs are not supported for this model."}}`
+	c, _ := newTestClient(t, "claude-3-haiku-20240307", http.StatusBadRequest, body)
+
+	_, err := c.Generate(context.Background(), newReq())
+	if !errors.Is(err, llm.ErrUnsupportedStructuredOutput) {
+		t.Fatalf("err = %v, want llm.ErrUnsupportedStructuredOutput", err)
+	}
+	for _, want := range []string{`"claude-3-haiku-20240307"`, "choosing-a-model.md", "Structured outputs are not supported"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not mention %q", err, want)
+		}
+	}
+}
+
+func TestGenerate_OtherBadRequestIsNotStructuredOutput(t *testing.T) {
+	const body = `{"type":"error","error":{"type":"invalid_request_error","message":"max_tokens: must be greater than 0"}}`
+	c, _ := newTestClient(t, "claude-sonnet-4-5", http.StatusBadRequest, body)
+
+	_, err := c.Generate(context.Background(), newReq())
+	if err == nil {
+		t.Fatal("Generate: want an error")
+	}
+	if errors.Is(err, llm.ErrUnsupportedStructuredOutput) {
+		t.Errorf("err = %v, want it classified as a plain provider error", err)
 	}
 }

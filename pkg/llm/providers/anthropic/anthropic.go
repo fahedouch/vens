@@ -19,8 +19,11 @@ package anthropic
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
+	"strings"
 
 	sdk "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -39,16 +42,38 @@ type Client struct {
 	model  string
 }
 
+const defaultBaseURL = "https://api.anthropic.com/"
+
 // New builds a client from ANTHROPIC_API_KEY.
 func New(model string) (*Client, error) {
+	return newClient(model)
+}
+
+// newClient applies extra options last so tests can observe the base URL the
+// SDK ends up with.
+func newClient(model string, extra ...option.RequestOption) (*Client, error) {
 	key := os.Getenv("ANTHROPIC_API_KEY")
 	if key == "" {
 		return nil, fmt.Errorf("anthropic: ANTHROPIC_API_KEY is not set")
 	}
+	// The SDK reads ANTHROPIC_BASE_URL through LookupEnv, which reports a variable
+	// set to the empty string as present, so anything exporting it unconditionally
+	// sends requests to "/v1/messages" with no host. Always pass a base URL.
+	opts := []option.RequestOption{
+		option.WithAPIKey(key),
+		option.WithBaseURL(resolveBaseURL(os.Getenv("ANTHROPIC_BASE_URL"))),
+	}
 	return &Client{
-		client: sdk.NewClient(option.WithAPIKey(key)),
+		client: sdk.NewClient(append(opts, extra...)...),
 		model:  model,
 	}, nil
+}
+
+func resolveBaseURL(env string) string {
+	if env == "" {
+		return defaultBaseURL
+	}
+	return env
 }
 
 // Generate forces the response to conform to req.Schema using Anthropic's native
@@ -75,6 +100,10 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 
 	msg, err := c.client.Messages.New(ctx, params)
 	if err != nil {
+		if detail, ok := unsupportedStructuredOutput(err); ok {
+			return "", fmt.Errorf("anthropic: %q: %w, see docs/concepts/choosing-a-model.md (%s)",
+				c.model, llm.ErrUnsupportedStructuredOutput, detail)
+		}
 		return "", fmt.Errorf("anthropic: message failed: %w", err)
 	}
 	if msg.StopReason == sdk.StopReasonMaxTokens {
@@ -87,4 +116,25 @@ func (c *Client) Generate(ctx context.Context, req llm.Request) (string, error) 
 		}
 	}
 	return "", fmt.Errorf("anthropic: no text content block in response")
+}
+
+func unsupportedStructuredOutput(err error) (string, bool) {
+	var apiErr *sdk.Error
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusBadRequest {
+		return "", false
+	}
+	var body struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal([]byte(apiErr.RawJSON()), &body) != nil {
+		return "", false
+	}
+	for _, s := range []string{"output_config", "structured output"} {
+		if strings.Contains(strings.ToLower(body.Error.Message), s) {
+			return body.Error.Message, true
+		}
+	}
+	return "", false
 }
